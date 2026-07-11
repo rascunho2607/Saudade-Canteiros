@@ -279,7 +279,7 @@ button{font:inherit;cursor:pointer}
     </p>
     <div class="actions">
       <button class="primary" id="enterBtn">começar pelas raízes</button>
-      <button class="ghost" id="demoIntroBtn">ver todos os galhos</button>
+      <!-- <button class="ghost" id="demoIntroBtn">ver todos os galhos</button> -->
     </div>
   </div>
 </section>
@@ -1170,12 +1170,12 @@ function showToast(text){
   showToast.t=setTimeout(()=>toast.classList.remove("show"),2300);
 }
 enterBtn.addEventListener("click",()=>intro.classList.add("hide"));
-demoIntroBtn.addEventListener("click",()=>{
-  demoMode=true;
-  demoToggle.checked=true;
-  refreshBranches();
-  intro.classList.add("hide");
-});
+// demoIntroBtn.addEventListener("click",()=>{
+//   demoMode=true;
+//   demoToggle.checked=true;
+//   refreshBranches();
+//   intro.classList.add("hide");
+// });
 settingsBtn.addEventListener("click",()=>settings.classList.toggle("open"));
 document.addEventListener("click",e=>{
   if(!settings.contains(e.target)&&!settingsBtn.contains(e.target))settings.classList.remove("open");
