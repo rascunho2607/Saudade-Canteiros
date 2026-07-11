@@ -321,10 +321,10 @@ button{font:inherit;cursor:pointer}
 
 <aside class="settings" id="settings">
   <h3>Ajustes do esboço</h3>
-  <div class="setting-row">
+  <!-- <div class="setting-row">
     <span>Liberar os 25 galhos</span>
     <label class="switch"><input type="checkbox" id="demoToggle"><span class="slider"></span></label>
-  </div>
+  </div> -->
   <div class="setting-row">
     <span>Reduzir o movimento da câmera</span>
     <label class="switch"><input type="checkbox" id="motionToggle"><span class="slider"></span></label>
@@ -474,7 +474,11 @@ const renderer=new THREE.WebGLRenderer({
   alpha:false,
   powerPreference:"high-performance"
 });
-renderer.setPixelRatio(Math.min(1.75,window.devicePixelRatio||1));
+function renderPixelRatio(){
+  const cap=innerWidth<=820?1.5:1.75;
+  return Math.min(cap,window.devicePixelRatio||1);
+}
+renderer.setPixelRatio(renderPixelRatio());
 renderer.setSize(innerWidth,innerHeight,false);
 renderer.outputColorSpace=THREE.SRGBColorSpace;
 renderer.toneMapping=THREE.ACESFilmicToneMapping;
@@ -1033,63 +1037,121 @@ scene.add(petals);
 
 const raycaster=new THREE.Raycaster();
 const pointer=new THREE.Vector2(9,9);
+const TAP_SLOP=10;
 
 function pointerFromEvent(e){
   pointer.x=(e.clientX/innerWidth)*2-1;
   pointer.y=-(e.clientY/innerHeight)*2+1;
 }
 let pointerDownPosition=null;
-let pointerDragged=false;
+let hoverFramePending=false;
+let canvasCursor="default";
+
+function setCanvasCursor(cursor){
+  if(cursor===canvasCursor)return;
+  canvasCursor=cursor;
+  canvas.style.cursor=cursor;
+}
+function raycastAtEvent(e){
+  pointerFromEvent(e);
+  raycaster.setFromCamera(pointer,camera);
+  return raycaster.intersectObjects(interactives,false)[0];
+}
+function updateHover(){
+  hoverFramePending=false;
+  if(pointerDownPosition)return;
+  raycaster.setFromCamera(pointer,camera);
+  const hit=raycaster.intersectObjects(interactives,false)[0];
+  const nextHit=hit?.object||null;
+  const nextHover=nextHit?.userData?.hoverTarget||nextHit;
+  if(nextHover===hovered)return;
+  if(hovered)hovered.scale.setScalar(1);
+  hovered=nextHover;
+  if(hovered)hovered.scale.setScalar(1.045);
+  setCanvasCursor(nextHit?"pointer":"default");
+}
+function requestHoverUpdate(){
+  if(hoverFramePending)return;
+  hoverFramePending=true;
+  requestAnimationFrame(updateHover);
+}
 canvas.addEventListener("pointerdown",e=>{
-  pointerDownPosition={x:e.clientX,y:e.clientY};
-  pointerDragged=false;
+  pointerDownPosition={x:e.clientX,y:e.clientY,id:e.pointerId};
 });
 canvas.addEventListener("pointermove",e=>{
-  pointerFromEvent(e);
   if(pointerDownPosition){
+    if(pointerDownPosition.id!==e.pointerId)return;
     const dx=e.clientX-pointerDownPosition.x;
     const dy=e.clientY-pointerDownPosition.y;
-    if(Math.hypot(dx,dy)>10)pointerDragged=true;
+    if(Math.hypot(dx,dy)>=TAP_SLOP)pointerDownPosition.dragged=true;
+    return;
   }
+  if(e.pointerType!=="mouse")return;
+  pointerFromEvent(e);
+  requestHoverUpdate();
 });
-canvas.addEventListener("pointerup",()=>{
-  requestAnimationFrame(()=>{pointerDownPosition=null;});
+canvas.addEventListener("pointerup",e=>{
+  if(!pointerDownPosition||pointerDownPosition.id!==e.pointerId)return;
+  const wasDragged=pointerDownPosition.dragged;
+  pointerDownPosition=null;
+  if(wasDragged)return;
+  const hit=raycastAtEvent(e);
+  if(hit)openMemory(hit.object.userData.index);
 });
 canvas.addEventListener("pointercancel",()=>{
   pointerDownPosition=null;
-  pointerDragged=false;
 });
 canvas.addEventListener("pointerleave",()=>{
+  if(pointerDownPosition)return;
   pointer.set(9,9);
+  if(hovered)hovered.scale.setScalar(1);
   hovered=null;
-  canvas.style.cursor="default";
-});
-canvas.addEventListener("click",e=>{
-  if(pointerDragged){
-    pointerDragged=false;
-    return;
-  }
-  pointerFromEvent(e);
-  raycaster.setFromCamera(pointer,camera);
-  const hit=raycaster.intersectObjects(interactives,false)[0];
-  if(hit)openMemory(hit.object.userData.index);
+  setCanvasCursor("default");
 });
 
-function updateScroll(){
-  const max=document.documentElement.scrollHeight-innerHeight;
-  scrollProgress=max>0?scrollY/max:0;
-  progressFill.style.height=`${Math.max(1,scrollProgress*100)}%`;
-  const track=document.querySelector(".progress").getBoundingClientRect();
-  progressDot.style.top=`${track.top+scrollProgress*track.height}px`;
-  scrollHint.classList.toggle("hide",scrollY>100);
+let scrollFramePending=false;
+let progressTrackTop=0;
+let progressTrackHeight=0;
+let lastProgress=-1;
+let lastChapterIndex=-1;
+let lockedNoteVisible=null;
+let scrollHintHidden=null;
+
+function updateProgressTrackMetrics(){
+  progressTrackHeight=innerHeight*.42;
+  progressTrackTop=(innerHeight-progressTrackHeight)/2;
 }
-addEventListener("scroll",updateScroll,{passive:true});
-addEventListener("wheel",e=>{
-  if(!e.deltaY)return;
-  e.preventDefault();
-  const delta=e.deltaMode===1?e.deltaY*16:e.deltaY;
-  window.scrollBy({top:delta,left:0,behavior:"auto"});
-},{passive:false});
+function requestScrollUpdate(){
+  if(scrollFramePending)return;
+  scrollFramePending=true;
+  requestAnimationFrame(()=>{
+    scrollFramePending=false;
+    updateScroll();
+  });
+}
+function updateScroll(){
+  const scrollHeight=document.documentElement.scrollHeight;
+  const viewportHeight=innerHeight;
+  const pageY=scrollY;
+  const max=scrollHeight-viewportHeight;
+  const nextProgress=max>0?THREE.MathUtils.clamp(pageY/max,0,1):0;
+
+  if(nextProgress!==lastProgress){
+    lastProgress=nextProgress;
+    scrollProgress=nextProgress;
+    progressFill.style.height=`${Math.max(1,nextProgress*100)}%`;
+    progressDot.style.top=`${progressTrackTop+nextProgress*progressTrackHeight}px`;
+    updateChapter();
+  }
+
+  const shouldHideHint=pageY>100;
+  if(shouldHideHint!==scrollHintHidden){
+    scrollHintHidden=shouldHideHint;
+    scrollHint.classList.toggle("hide",shouldHideHint);
+  }
+  updateLockedNote();
+}
+addEventListener("scroll",requestScrollUpdate,{passive:true});
 
 const chapters=[
   {from:0,to:.17,eye:"02–05 de julho · raízes",title:"Foi aqui que a saudade começou.",text:"Os primeiros dias ainda ficam perto do chão."},
@@ -1099,10 +1161,21 @@ const chapters=[
   {from:.83,to:1.01,eye:"24–26 de julho · reencontro",title:"No topo, a saudade vira abraço.",text:"A última fotografia espera na parte mais florida da copa."}
 ];
 function updateChapter(){
-  const c=chapters.find(x=>scrollProgress>=x.from&&scrollProgress<x.to)||chapters.at(-1);
+  const index=chapters.findIndex(x=>scrollProgress>=x.from&&scrollProgress<x.to);
+  const nextIndex=index===-1?chapters.length-1:index;
+  if(nextIndex===lastChapterIndex)return;
+  lastChapterIndex=nextIndex;
+  const c=chapters[nextIndex];
   chapterEyebrow.textContent=c.eye;
   chapterTitle.textContent=c.title;
   chapterText.textContent=c.text;
+}
+function updateLockedNote(){
+  const maxUnlockedT=.075+Math.max(0,unlockedCount()-1)*(.865/(MEM.length-1));
+  const shouldShow=!demoMode&&scrollProgress>maxUnlockedT+.07;
+  if(shouldShow===lockedNoteVisible)return;
+  lockedNoteVisible=shouldShow;
+  lockedNote.classList.toggle("show",shouldShow);
 }
 
 function smoothstep(a,b,x){
@@ -1138,17 +1211,6 @@ function animate(time=0){
     }
   });
 
-  raycaster.setFromCamera(pointer,camera);
-  const hit=raycaster.intersectObjects(interactives,false)[0];
-  const nextHit=hit?.object||null;
-  const nextHover=nextHit?.userData?.hoverTarget||nextHit;
-  if(nextHover!==hovered){
-    if(hovered)hovered.scale.setScalar(1);
-    hovered=nextHover;
-    if(hovered)hovered.scale.setScalar(1.045);
-    canvas.style.cursor=nextHit?"pointer":"default";
-  }
-
   petals.rotation.y=time*.000015;
   for(let i=0;i<petalCount;i++){
     const p=petalData[i];
@@ -1170,10 +1232,6 @@ function animate(time=0){
   petals.instanceMatrix.needsUpdate=true;
 
   pinkLight.position.y=25+Math.sin(time*.00035)*3;
-  updateChapter();
-
-  const maxUnlockedT=.075+Math.max(0,unlockedCount()-1)*(.865/(MEM.length-1));
-  lockedNote.classList.toggle("show",!demoMode&&scrollProgress>maxUnlockedT+.07);
 
   renderer.render(scene,camera);
 }
@@ -1216,11 +1274,11 @@ settingsBtn.addEventListener("click",()=>settings.classList.toggle("open"));
 document.addEventListener("click",e=>{
   if(!settings.contains(e.target)&&!settingsBtn.contains(e.target))settings.classList.remove("open");
 });
-demoToggle.addEventListener("change",()=>{
-  demoMode=demoToggle.checked;
-  refreshBranches();
-  showToast(demoMode?"Os 25 galhos foram liberados.":"Datas reais restauradas.");
-});
+// demoToggle.addEventListener("change",()=>{
+//   demoMode=demoToggle.checked;
+//   refreshBranches();
+//   showToast(demoMode?"Os 25 galhos foram liberados.":"Datas reais restauradas.");
+// });
 motionToggle.addEventListener("change",()=>{
   reducedMotion=motionToggle.checked;
   showToast(reducedMotion?"Movimento da câmera reduzido.":"Movimento cinematográfico restaurado.");
@@ -1261,15 +1319,19 @@ soundBtn.addEventListener("click",()=>{
 });
 
 function onResize(){
-  renderer.setPixelRatio(Math.min(1.75,window.devicePixelRatio||1));
+  renderer.setPixelRatio(renderPixelRatio());
   renderer.setSize(innerWidth,innerHeight,false);
   const profile=cameraProfile();
   camera.aspect=innerWidth/innerHeight;
   camera.fov=profile.fov;
   camera.updateProjectionMatrix();
+  updateProgressTrackMetrics();
+  lastProgress=-1;
+  requestScrollUpdate();
 }
 addEventListener("resize",onResize);
 
+updateProgressTrackMetrics();
 updateScroll();
 animate();
 window.__treeReady=true;
