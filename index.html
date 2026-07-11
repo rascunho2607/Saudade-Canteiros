@@ -1,0 +1,1241 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#09111f">
+<title>A Cerejeira dos Dias — 3D Low Poly</title>
+<style>
+:root{
+  --bg:#09111f;
+  --paper:#fff9f2;
+  --ink:#3c2933;
+  --muted:#aeb8ca;
+  --pink:#ff9fc5;
+  --pink-2:#ffd5e5;
+  --gold:#efd4a2;
+  --glass:rgba(9,16,29,.66);
+  --line:rgba(255,255,255,.12);
+  --shadow:0 28px 100px rgba(0,0,0,.42);
+  --serif:ui-serif,Georgia,"Times New Roman",serif;
+  --sans:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;background:var(--bg);color:var(--paper);font-family:var(--sans)}
+body{height:6900px;overflow-x:hidden}
+button{font:inherit;cursor:pointer}
+[hidden]{display:none!important}
+#scene{position:fixed;inset:0;width:100%;height:100%;display:block;z-index:1;touch-action:none}
+.grain{
+  position:fixed;inset:0;z-index:90;pointer-events:none;opacity:.13;
+  background-image:
+    radial-gradient(circle at 18% 23%,rgba(255,255,255,.42) 0 1px,transparent 1.2px),
+    radial-gradient(circle at 78% 66%,rgba(255,255,255,.24) 0 1px,transparent 1.2px);
+  background-size:84px 84px,131px 131px;
+  mix-blend-mode:soft-light;
+}
+.vignette{
+  position:fixed;inset:0;z-index:15;pointer-events:none;
+  background:
+    linear-gradient(180deg,rgba(3,7,14,.30),transparent 22%,transparent 76%,rgba(4,9,16,.42)),
+    radial-gradient(ellipse at center,transparent 50%,rgba(2,6,12,.30));
+}
+.intro{
+  position:fixed;inset:0;z-index:80;display:grid;place-items:center;padding:22px;
+  background:
+    radial-gradient(circle at 50% 34%,rgba(255,159,197,.17),transparent 28%),
+    linear-gradient(180deg,rgba(5,8,15,.96),rgba(8,14,25,.97));
+  transition:opacity .9s ease,visibility .9s ease,transform .9s ease;
+}
+.intro.hide{opacity:0;visibility:hidden;transform:scale(1.02);pointer-events:none}
+.intro-card{
+  width:min(820px,100%);padding:42px 26px 36px;text-align:center;border-radius:38px;
+  background:linear-gradient(180deg,rgba(255,255,255,.11),rgba(255,255,255,.045));
+  border:1px solid rgba(255,255,255,.14);backdrop-filter:blur(22px);box-shadow:var(--shadow);
+  position:relative;overflow:hidden;
+}
+.intro-card:before{
+  content:"";position:absolute;inset:-36%;z-index:-1;
+  background:
+    radial-gradient(circle at 33% 43%,rgba(255,159,197,.25),transparent 24%),
+    radial-gradient(circle at 69% 48%,rgba(239,212,162,.14),transparent 24%);
+  animation:breathe 6s ease-in-out infinite;
+}
+@keyframes breathe{50%{transform:scale(1.08);opacity:.72}}
+.kicker{font-size:.74rem;letter-spacing:.22em;text-transform:uppercase;color:var(--pink-2);font-weight:900}
+.intro h1{
+  margin:15px 0 0;font-family:var(--serif);font-size:clamp(3rem,8vw,7rem);
+  line-height:.92;font-weight:500;letter-spacing:-.045em;text-wrap:balance;
+}
+.intro p{
+  max-width:650px;margin:24px auto 0;font-family:var(--serif);
+  color:rgba(255,249,242,.78);font-size:clamp(1.06rem,2.4vw,1.38rem);line-height:1.75;
+}
+.actions{display:flex;justify-content:center;gap:12px;flex-wrap:wrap;margin-top:30px}
+.primary,.ghost{
+  border-radius:999px;padding:14px 22px;font-weight:900;transition:.22s ease;
+}
+.primary{
+  border:0;background:linear-gradient(135deg,var(--pink),var(--gold));color:#35212c;
+  box-shadow:0 18px 52px rgba(255,159,197,.24)
+}
+.primary:hover{transform:translateY(-2px);filter:brightness(1.04)}
+.ghost{border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.07);color:#fff}
+
+.hud{
+  position:fixed;left:0;right:0;top:0;z-index:35;
+  display:flex;justify-content:space-between;align-items:center;gap:14px;
+  padding:13px clamp(12px,3vw,32px);
+  background:linear-gradient(180deg,rgba(5,9,17,.82),rgba(5,9,17,.10));
+  backdrop-filter:blur(18px);border-bottom:1px solid rgba(255,255,255,.06);
+}
+.brand{display:flex;align-items:center;gap:10px}
+.brand-mark{
+  width:18px;height:18px;border-radius:50%;
+  background:radial-gradient(circle at 34% 32%,#fff 0 12%,var(--pink-2) 14% 45%,var(--pink) 46%);
+  box-shadow:0 0 24px rgba(255,159,197,.65)
+}
+.brand strong{display:block;font-family:var(--serif);font-size:1.06rem;font-weight:500}
+.brand small{display:block;margin-top:2px;color:rgba(255,249,242,.50);font-size:.68rem}
+.hud-actions{display:flex;gap:7px}
+.icon{
+  width:40px;height:40px;border-radius:50%;display:grid;place-items:center;
+  border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.07);color:#fff;
+  transition:.2s ease;
+}
+.icon:hover{background:rgba(255,255,255,.13);transform:translateY(-1px)}
+
+.chapter{
+  position:fixed;left:50%;top:88px;transform:translateX(-50%);z-index:25;
+  width:min(470px,calc(100vw - 32px));text-align:center;pointer-events:none;
+  text-shadow:0 3px 24px rgba(0,0,0,.62);
+}
+.chapter .eyebrow{
+  color:var(--pink-2);font-size:.69rem;letter-spacing:.18em;text-transform:uppercase;font-weight:900;
+}
+.chapter h2{
+  margin:8px 0 0;font-family:var(--serif);font-size:clamp(1.9rem,4.2vw,3.5rem);
+  line-height:.95;font-weight:500;letter-spacing:-.03em;
+}
+.chapter p{
+  margin:10px auto 0;max-width:400px;color:rgba(255,249,242,.66);
+  font-family:var(--serif);line-height:1.5;font-size:.96rem;
+}
+
+.progress{
+  position:fixed;left:18px;top:50%;transform:translateY(-50%);z-index:32;
+  width:5px;height:42vh;border-radius:999px;background:rgba(255,255,255,.08);overflow:hidden;
+}
+.progress-fill{
+  width:100%;height:0;border-radius:inherit;
+  background:linear-gradient(180deg,var(--gold),var(--pink));box-shadow:0 0 18px rgba(255,159,197,.55)
+}
+.progress-dot{
+  position:fixed;left:11px;top:50%;z-index:33;width:19px;height:19px;border-radius:50%;
+  transform:translateY(-50%);background:radial-gradient(circle,#fff 0 16%,var(--pink-2) 18% 48%,var(--pink) 50%);
+  box-shadow:0 0 18px rgba(255,159,197,.62)
+}
+.scroll-hint{
+  position:fixed;left:50%;bottom:28px;transform:translateX(-50%);z-index:30;
+  display:flex;flex-direction:column;align-items:center;gap:8px;
+  color:rgba(255,249,242,.62);font-size:.75rem;letter-spacing:.08em;text-transform:uppercase;transition:.3s;
+}
+.scroll-hint.hide{opacity:0;transform:translate(-50%,10px)}
+.mouse{width:22px;height:34px;border:1px solid rgba(255,255,255,.34);border-radius:999px;position:relative}
+.mouse:after{
+  content:"";position:absolute;top:7px;left:50%;width:3px;height:7px;border-radius:99px;
+  background:var(--pink-2);transform:translateX(-50%);animation:wheel 1.6s infinite
+}
+@keyframes wheel{to{transform:translate(-50%,10px);opacity:0}}
+
+.locked-note{
+  position:fixed;left:50%;bottom:85px;transform:translateX(-50%);z-index:28;
+  padding:10px 14px;border-radius:999px;background:rgba(8,14,25,.66);
+  border:1px solid rgba(255,255,255,.10);backdrop-filter:blur(14px);
+  color:rgba(255,249,242,.64);font-size:.78rem;opacity:0;transition:.3s;pointer-events:none;
+}
+.locked-note.show{opacity:1}
+
+.settings{
+  position:fixed;right:18px;top:72px;z-index:50;width:min(330px,calc(100vw - 36px));
+  padding:18px;border-radius:24px;background:rgba(7,13,23,.92);
+  border:1px solid rgba(255,255,255,.12);backdrop-filter:blur(20px);box-shadow:var(--shadow);display:none;
+}
+.settings.open{display:block}
+.settings h3{font-family:var(--serif);font-size:1.45rem;font-weight:500;margin:0 0 12px}
+.setting-row{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:11px 0;border-top:1px solid rgba(255,255,255,.08)}
+.setting-row span{font-size:.82rem;color:rgba(255,249,242,.72)}
+.switch{position:relative;width:48px;height:28px;flex:none}
+.switch input{opacity:0;width:0;height:0}
+.slider{position:absolute;inset:0;border-radius:999px;background:rgba(255,255,255,.13);transition:.2s}
+.slider:before{content:"";position:absolute;width:20px;height:20px;left:4px;top:4px;border-radius:50%;background:#fff;transition:.2s}
+.switch input:checked+.slider{background:linear-gradient(90deg,var(--pink),#dd94b1)}
+.switch input:checked+.slider:before{transform:translateX(20px)}
+.settings small{display:block;color:rgba(255,249,242,.43);line-height:1.5;margin-top:10px}
+
+.modal{
+  position:fixed;inset:0;z-index:70;display:grid;place-items:center;padding:20px;
+  background:rgba(4,7,13,.68);backdrop-filter:blur(18px);
+  opacity:0;visibility:hidden;transition:.32s ease;
+}
+.modal.open{opacity:1;visibility:visible}
+.memory-card{
+  width:min(980px,100%);max-height:min(88vh,860px);overflow:auto;
+  display:grid;grid-template-columns:minmax(0,1.08fr) minmax(320px,.92fr);
+  border-radius:34px;background:linear-gradient(180deg,#fffaf4,#f6eade);color:var(--ink);
+  box-shadow:0 34px 120px rgba(0,0,0,.56);position:relative;
+  transform:translateY(18px) scale(.985);transition:.32s ease;
+}
+.modal.open .memory-card{transform:translateY(0) scale(1)}
+.close{
+  position:absolute;right:14px;top:14px;z-index:3;width:42px;height:42px;border-radius:50%;
+  border:1px solid rgba(60,39,49,.12);background:rgba(255,255,255,.82);color:var(--ink);font-size:1.25rem;
+}
+.card-photo{min-height:520px;background:#241d26;position:relative;overflow:hidden;isolation:isolate}
+.card-photo-background{
+  position:absolute;inset:-32px;width:calc(100% + 64px);height:calc(100% + 64px);
+  object-fit:cover;filter:blur(28px) brightness(.55) saturate(.9);transform:scale(1.08);pointer-events:none
+}
+.card-photo:before{
+  content:"";position:absolute;inset:0;z-index:1;pointer-events:none;
+  background:radial-gradient(ellipse at center,rgba(24,15,25,.04) 35%,rgba(24,15,25,.3) 100%),linear-gradient(180deg,rgba(24,15,25,.08),rgba(24,15,25,.28))
+}
+.card-photo-foreground{position:relative;z-index:2;width:100%;height:100%;display:grid;place-items:center}
+.card-photo-main{width:100%;height:100%;object-fit:contain;object-position:center;display:block}
+.card-caption{
+  position:absolute;left:20px;bottom:18px;z-index:3;color:#fff;font-size:.76rem;
+  text-transform:uppercase;letter-spacing:.10em;font-weight:900;text-shadow:0 2px 16px rgba(0,0,0,.55)
+}
+.card-letter{padding:44px 36px 34px;display:flex;flex-direction:column;justify-content:center;position:relative}
+.card-letter:before{
+  content:"";position:absolute;inset:0;opacity:.32;pointer-events:none;
+  background:
+    linear-gradient(90deg,rgba(120,79,100,.06) 1px,transparent 1px),
+    linear-gradient(rgba(120,79,100,.055) 1px,transparent 1px);
+  background-size:26px 26px
+}
+.card-letter>*{position:relative}
+.card-date{font-size:.76rem;letter-spacing:.16em;text-transform:uppercase;color:#98697f;font-weight:900}
+.card-letter h3{
+  margin:12px 0 18px;font-family:var(--serif);font-size:clamp(2rem,4vw,4rem);
+  font-weight:500;line-height:.96;letter-spacing:-.03em
+}
+.card-letter p{
+  margin:0;font-family:var(--serif);font-size:clamp(1.08rem,2vw,1.29rem);
+  line-height:1.76;color:#4a3340
+}
+.signature{font-family:var(--serif);text-align:right;margin-top:22px;font-size:1.16rem}
+
+.toast{
+  position:fixed;left:50%;top:84px;transform:translate(-50%,-12px);z-index:86;
+  padding:11px 15px;border-radius:999px;background:rgba(7,13,23,.9);color:#fff;
+  border:1px solid rgba(255,255,255,.12);backdrop-filter:blur(15px);box-shadow:var(--shadow);
+  opacity:0;pointer-events:none;transition:.25s;font-size:.82rem
+}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+.loading-error{
+  position:fixed;inset:0;z-index:95;display:none;place-items:center;padding:24px;background:#09111f;
+  text-align:center
+}
+.loading-error.show{display:grid}
+.loading-error div{max-width:540px}
+.loading-error h2{font-family:var(--serif);font-size:2.2rem;font-weight:500}
+.loading-error p{color:rgba(255,249,242,.66);line-height:1.65}
+
+@media(max-width:820px){
+  body{height:7600px}
+  .memory-card{grid-template-columns:1fr}
+  .card-photo{min-height:330px}
+  .card-letter{padding:30px 24px}
+  .brand small{display:none}
+  .chapter{top:82px}
+}
+@media(max-width:560px){
+  body{height:7900px}
+  .hud{padding:11px}
+  .icon{width:38px;height:38px}
+  .brand strong{font-size:.98rem}
+  .chapter h2{font-size:2rem}
+  .chapter p{font-size:.86rem;max-width:300px}
+  .progress{left:8px}
+  .progress-dot{left:1px}
+  .scroll-hint{bottom:22px}
+  .intro-card{padding:34px 18px 30px}
+}
+</style>
+</head>
+<body>
+<canvas id="scene"></canvas>
+<div class="vignette"></div>
+<div class="grain"></div>
+
+<section class="intro" id="intro">
+  <div class="intro-card">
+    <div class="kicker">esboço tridimensional · low poly</div>
+    <h1>Uma árvore que é um caminho.</h1>
+    <p>
+      Desça a página para a câmera subir. Os galhos aparecem como etapas,
+      e cada fotografia vive dentro de um pequeno pedaço da copa.
+    </p>
+    <div class="actions">
+      <button class="primary" id="enterBtn">começar pelas raízes</button>
+      <button class="ghost" id="demoIntroBtn">ver todos os galhos</button>
+    </div>
+  </div>
+</section>
+
+<header class="hud">
+  <div class="brand">
+    <span class="brand-mark"></span>
+    <div>
+      <strong>A Cerejeira dos Dias</strong>
+      <small>roadmap 3D até o reencontro</small>
+    </div>
+  </div>
+  <div class="hud-actions">
+    <button class="icon" id="soundBtn" aria-label="Ativar som">♪</button>
+    <button class="icon" id="settingsBtn" aria-label="Abrir ajustes">⋯</button>
+  </div>
+</header>
+
+<section class="chapter">
+  <div class="eyebrow" id="chapterEyebrow">02 de julho · raízes</div>
+  <h2 id="chapterTitle">Foi aqui que a saudade começou.</h2>
+  <p id="chapterText">Desça a página para subir pela árvore.</p>
+</section>
+
+<div class="progress"><div class="progress-fill" id="progressFill"></div></div>
+<div class="progress-dot" id="progressDot"></div>
+<div class="scroll-hint" id="scrollHint">
+  <div class="mouse"></div>
+  <span>desça para subir</span>
+</div>
+<div class="locked-note" id="lockedNote">os próximos galhos ainda estão crescendo</div>
+
+<aside class="settings" id="settings">
+  <h3>Ajustes do esboço</h3>
+  <div class="setting-row">
+    <span>Liberar os 25 galhos</span>
+    <label class="switch"><input type="checkbox" id="demoToggle"><span class="slider"></span></label>
+  </div>
+  <div class="setting-row">
+    <span>Reduzir o movimento da câmera</span>
+    <label class="switch"><input type="checkbox" id="motionToggle"><span class="slider"></span></label>
+  </div>
+  <small>
+    Cada galho usa a foto correspondente da memória quando ela já estiver disponível.
+  </small>
+</aside>
+
+<section class="modal" id="modal" role="dialog" aria-modal="true">
+  <article class="memory-card">
+    <button class="close" id="closeModal" aria-label="Fechar">×</button>
+    <div class="card-photo card-photo-area">
+      <img class="card-photo-background" id="cardImageBackground" alt="" aria-hidden="true">
+      <div class="card-photo-foreground">
+        <img class="card-photo-main" id="cardImage" alt="">
+      </div>
+      <div class="card-caption" id="cardCaption"></div>
+    </div>
+    <div class="card-letter">
+      <div class="card-date" id="cardDate"></div>
+      <h3 id="cardTitle"></h3>
+      <p id="cardText"></p>
+      <div class="signature">— pensando em você</div>
+    </div>
+  </article>
+</section>
+
+<div class="toast" id="toast"></div>
+<div class="loading-error" id="loadingError">
+  <div>
+    <h2>O cenário 3D não carregou.</h2>
+    <p>
+      Este arquivo precisa de conexão com a internet na primeira abertura para carregar a biblioteca 3D.
+      Abra-o no Chrome ou Edge e confirme que a conexão está ativa.
+    </p>
+  </div>
+</div>
+
+<script>
+setTimeout(() => {
+  if (!window.__treeReady) document.getElementById("loadingError").classList.add("show");
+}, 7000);
+</script>
+
+<script type="module">
+import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.185.1/build/three.module.js";
+
+const CONFIG={
+  partida:"2026-07-02",
+  retorno:"2026-07-26",
+  timezone:"America/Fortaleza"
+};
+
+const MEM=[
+["2026-07-02","O começo","Hoje você foi, e o dia pareceu um pouco mais silencioso."],
+["2026-07-03","Primeiro dia inteiro","Senti falta de te contar qualquer coisa só para ouvir tua voz."],
+["2026-07-04","Um espaço que é teu","A distância deixou mais claro o tamanho do lugar que você ocupa em mim."],
+["2026-07-05","Saudade mansa","Hoje a saudade sentou do meu lado e ficou lembrando de você comigo."],
+["2026-07-06","As pequenas coisas","Senti falta até dos detalhes. Principalmente deles."],
+["2026-07-07","A espera também guarda","Cada dia traz uma lembrança tua e mais uma certeza de que quero você por perto."],
+["2026-07-08","Uma desculpa qualquer","Hoje eu queria te contar uma bobagem só para ouvir tua risada."],
+["2026-07-09","A distância entrega","Ela mostra, sem dúvida nenhuma, quem a gente realmente quer por perto."],
+["2026-07-10","Mais perto","Mais um galho nasceu. Menos um dia entre a minha mão e a tua."],
+["2026-07-11","Dez dias","A saudade continua aqui, mas agora divide espaço com a alegria do caminho já vencido."],
+["2026-07-12","Teu lugar favorito","Mesmo longe, você continua sendo onde meus pensamentos gostam de descansar."],
+["2026-07-13","Metade do caminho","O abraço do dia 26 começou a parecer um pouco mais próximo."],
+["2026-07-14","Só tua presença","Hoje não senti falta de fazer nada especial. Senti falta só de ter você perto."],
+["2026-07-15","Meu plano favorito","Te ver de novo virou o melhor plano do mês."],
+["2026-07-16","Um instante do dia","Sempre existe uma hora em que tudo para um pouco e eu lembro de você."],
+["2026-07-17","A voz que aproxima","Tua voz consegue encurtar quilômetros, mesmo sem substituir teu abraço."],
+["2026-07-18","Saudade boa","Algumas saudades são só a prova de que existe alguém muito especial do outro lado."],
+["2026-07-19","Uma semana","Agora já consigo imaginar o momento de te ver e pensar: finalmente."],
+["2026-07-20","Cabe nas mãos","Os dias que faltam começaram a caber nas mãos."],
+["2026-07-21","Quero ouvir tudo","Quando você voltar, quero ouvir cada história, até as que não parecem importantes."],
+["2026-07-22","Quatro amanheceres","A copa já está quase inteira aberta, como se também soubesse que você está voltando."],
+["2026-07-23","Contagem regressiva","Agora a espera mudou de nome."],
+["2026-07-24","Dois dias","O reencontro já está perto o suficiente para eu imaginar teu rosto."],
+["2026-07-25","A última noite","Amanhã eu não quero contar os dias. Quero contar os minutos."],
+["2026-07-26","Bem-vinda de volta","A saudade cumpriu o caminho dela. Agora vem a melhor parte: ter você perto de novo."]
+];
+
+const $=s=>document.querySelector(s);
+const canvas=$("#scene");
+const intro=$("#intro");
+const enterBtn=$("#enterBtn");
+const demoIntroBtn=$("#demoIntroBtn");
+const settings=$("#settings");
+const settingsBtn=$("#settingsBtn");
+const demoToggle=$("#demoToggle");
+const motionToggle=$("#motionToggle");
+const soundBtn=$("#soundBtn");
+const progressFill=$("#progressFill");
+const progressDot=$("#progressDot");
+const scrollHint=$("#scrollHint");
+const lockedNote=$("#lockedNote");
+const modal=$("#modal");
+const closeModal=$("#closeModal");
+const cardImageBackground=$("#cardImageBackground");
+const cardImage=$("#cardImage");
+const cardCaption=$("#cardCaption");
+const cardDate=$("#cardDate");
+const cardTitle=$("#cardTitle");
+const cardText=$("#cardText");
+const toast=$("#toast");
+const chapterEyebrow=$("#chapterEyebrow");
+const chapterTitle=$("#chapterTitle");
+const chapterText=$("#chapterText");
+
+const backgroundAudio=new Audio("src/audio/RAIMUNDO-FAGNER-CANTEIROS.mp3");
+backgroundAudio.loop=true;
+backgroundAudio.volume=.25;
+
+let demoMode=false;
+let reducedMotion=false;
+let soundOn=false;
+let audioCtx=null;
+let scrollProgress=0;
+let currentCameraY=3.8;
+let hovered=null;
+
+function dateKey(){
+  const parts=new Intl.DateTimeFormat("en-GB",{
+    timeZone:CONFIG.timezone,year:"numeric",month:"2-digit",day:"2-digit"
+  }).formatToParts(new Date());
+  const o=Object.fromEntries(parts.map(p=>[p.type,p.value]));
+  return `${o.year}-${o.month}-${o.day}`;
+}
+function unlockedCount(){
+  if(demoMode)return MEM.length;
+  const today=dateKey();
+  if(today<CONFIG.partida)return 0;
+  if(today>CONFIG.retorno)return MEM.length;
+  return MEM.filter(m=>m[0]<=today).length;
+}
+const isUnlocked=i=>demoMode||i<unlockedCount();
+const fmt=iso=>{const [y,m,d]=iso.split("-");return `${d}/${m}`;};
+function ageFactorFor(index,countNow=unlockedCount()){
+  if(demoMode)return (MEM.length-1-index)/Math.max(1,MEM.length-1);
+  if(!isUnlocked(index) || countNow<=1)return 0;
+  return THREE.MathUtils.clamp((countNow-1-index)/Math.max(1,countNow-1),0,1);
+}
+
+const renderer=new THREE.WebGLRenderer({
+  canvas,
+  antialias:true,
+  alpha:false,
+  powerPreference:"high-performance"
+});
+renderer.setPixelRatio(Math.min(1.75,window.devicePixelRatio||1));
+renderer.setSize(innerWidth,innerHeight,false);
+renderer.outputColorSpace=THREE.SRGBColorSpace;
+renderer.toneMapping=THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure=1.12;
+renderer.shadowMap.enabled=true;
+renderer.shadowMap.type=THREE.PCFShadowMap;
+
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0x091321);
+scene.fog=new THREE.FogExp2(0x0b1525,.016);
+
+const camera=new THREE.PerspectiveCamera(43,innerWidth/innerHeight,.1,160);
+camera.position.set(0,3.8,15.5);
+
+const hemi=new THREE.HemisphereLight(0xbfd9ff,0x283629,1.55);
+scene.add(hemi);
+
+const key=new THREE.DirectionalLight(0xffe6d2,2.4);
+key.position.set(8,22,12);
+key.castShadow=true;
+key.shadow.mapSize.set(1024,1024);
+key.shadow.camera.left=-18;
+key.shadow.camera.right=18;
+key.shadow.camera.top=30;
+key.shadow.camera.bottom=-10;
+scene.add(key);
+
+const pinkLight=new THREE.PointLight(0xffa8cc,18,32,2);
+pinkLight.position.set(-7,26,7);
+scene.add(pinkLight);
+
+const moonLight=new THREE.PointLight(0xb8d5ff,10,40,2);
+moonLight.position.set(9,49,-3);
+scene.add(moonLight);
+
+const groundMat=new THREE.MeshStandardMaterial({
+  color:0x20342d,roughness:1,metalness:0,flatShading:true
+});
+const ground=new THREE.Mesh(new THREE.CylinderGeometry(8.5,10.5,1.1,10),groundMat);
+ground.position.y=-.75;
+ground.receiveShadow=true;
+scene.add(ground);
+
+const baseRockMat=new THREE.MeshStandardMaterial({color:0x314039,roughness:1,flatShading:true});
+for(let i=0;i<14;i++){
+  const r=.32+Math.random()*.58;
+  const rock=new THREE.Mesh(new THREE.DodecahedronGeometry(r,0),baseRockMat);
+  const a=(i/14)*Math.PI*2;
+  rock.position.set(Math.cos(a)*(6.5+Math.random()*2),-.05+Math.random()*.25,Math.sin(a)*(5+Math.random()*2));
+  rock.rotation.set(Math.random(),Math.random(),Math.random());
+  rock.scale.y=.55+Math.random()*.45;
+  rock.castShadow=true;
+  scene.add(rock);
+}
+
+const starsGeo=new THREE.BufferGeometry();
+const starsCount=500;
+const positions=new Float32Array(starsCount*3);
+for(let i=0;i<starsCount;i++){
+  const a=Math.random()*Math.PI*2;
+  const radius=28+Math.random()*45;
+  positions[i*3]=Math.cos(a)*radius;
+  positions[i*3+1]=Math.random()*72;
+  positions[i*3+2]=Math.sin(a)*radius-15;
+}
+starsGeo.setAttribute("position",new THREE.BufferAttribute(positions,3));
+const stars=new THREE.Points(starsGeo,new THREE.PointsMaterial({
+  color:0xfff2e5,size:.08,transparent:true,opacity:.58,sizeAttenuation:true
+}));
+scene.add(stars);
+
+const tree=new THREE.Group();
+scene.add(tree);
+const trunkGrowthGroup=new THREE.Group();
+tree.add(trunkGrowthGroup);
+
+const woodMat=new THREE.MeshStandardMaterial({
+  color:0x633e4b,roughness:.88,metalness:0,flatShading:true
+});
+const woodDarkMat=new THREE.MeshStandardMaterial({
+  color:0x3b2631,roughness:1,flatShading:true
+});
+const leafMats=[
+  new THREE.MeshStandardMaterial({color:0x779b7c,roughness:1,flatShading:true}),
+  new THREE.MeshStandardMaterial({color:0x98b996,roughness:1,flatShading:true}),
+  new THREE.MeshStandardMaterial({color:0x52745e,roughness:1,flatShading:true})
+];
+const blossomMats=[
+  new THREE.MeshStandardMaterial({color:0xff9fc5,roughness:.78,flatShading:true,emissive:0x2b0917,emissiveIntensity:.25}),
+  new THREE.MeshStandardMaterial({color:0xffd5e5,roughness:.72,flatShading:true,emissive:0x321020,emissiveIntensity:.25}),
+  new THREE.MeshStandardMaterial({color:0xffeef5,roughness:.72,flatShading:true,emissive:0x321020,emissiveIntensity:.18})
+];
+const branchHitMat=new THREE.MeshBasicMaterial({
+  transparent:true,
+  opacity:0,
+  depthWrite:false,
+  colorWrite:false
+});
+
+function cylinderBetween(a,b,r1,r2,material,radial=7){
+  const delta=new THREE.Vector3().subVectors(b,a);
+  const length=delta.length();
+  const geo=new THREE.CylinderGeometry(r2,r1,length,radial,1,false);
+  const mesh=new THREE.Mesh(geo,material);
+  mesh.position.copy(a).add(b).multiplyScalar(.5);
+  mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),delta.clone().normalize());
+  mesh.castShadow=true;
+  mesh.receiveShadow=true;
+  return mesh;
+}
+
+const trunkPoints=[];
+const trunkSegments=30;
+const TREE_TOP=60;
+for(let i=0;i<=trunkSegments;i++){
+  const t=i/trunkSegments;
+  const y=t*TREE_TOP;
+  const x=Math.sin(t*5.1)*.48+Math.sin(t*11.7)*.14;
+  const z=Math.sin(t*3.8+1.2)*.35+Math.sin(t*9.2)*.12;
+  trunkPoints.push(new THREE.Vector3(x,y,z));
+}
+for(let i=0;i<trunkSegments;i++){
+  const t=i/trunkSegments;
+  const r1=1.05*(1-t*.68)+.06;
+  const r2=1.05*(1-(t+1/trunkSegments)*.68)+.05;
+  const seg=cylinderBetween(trunkPoints[i],trunkPoints[i+1],r1,r2,i%5===0?woodDarkMat:woodMat,8);
+  tree.add(seg);
+}
+
+// raízes
+const roots=[
+  [new THREE.Vector3(0,.2,0),new THREE.Vector3(-4,-.2,2.6)],
+  [new THREE.Vector3(.1,.1,.2),new THREE.Vector3(4.6,-.3,1.2)],
+  [new THREE.Vector3(-.2,.1,-.1),new THREE.Vector3(-2.2,-.25,-4.2)],
+  [new THREE.Vector3(.2,.1,-.2),new THREE.Vector3(3,-.2,-3.4)]
+];
+roots.forEach(([a,b],i)=>{
+  const mid=a.clone().lerp(b,.52).add(new THREE.Vector3((i%2?1:-1)*.35,.35,(i-1.5)*.12));
+  tree.add(cylinderBetween(a,mid,.62,.32,woodDarkMat,7));
+  tree.add(cylinderBetween(mid,b,.32,.06,woodMat,7));
+});
+
+function rebuildTrunkGrowth(countNow=unlockedCount()){
+  while(trunkGrowthGroup.children.length){
+    const child=trunkGrowthGroup.children.pop();
+    if(child.geometry) child.geometry.dispose?.();
+  }
+  const progress=THREE.MathUtils.clamp(countNow/Math.max(1,MEM.length),0,1);
+  const grownSegs=Math.max(2,Math.round(progress*trunkSegments));
+  for(let i=0;i<grownSegs;i++){
+    const t=i/trunkSegments;
+    const baseR1=1.05*(1-t*.68)+.06;
+    const baseR2=1.05*(1-(t+1/trunkSegments)*.68)+.05;
+    const maturityFalloff=1-i/Math.max(1,grownSegs);
+    const boost=(.08+progress*.16)*maturityFalloff;
+    const sleeve=cylinderBetween(
+      trunkPoints[i],
+      trunkPoints[i+1],
+      baseR1*(1.06+boost),
+      baseR2*(1.05+boost*.92),
+      i%4===0?woodDarkMat:woodMat,
+      8
+    );
+    trunkGrowthGroup.add(sleeve);
+  }
+}
+
+function trunkPointAt(t){
+  const scaled=t*trunkSegments;
+  const i=Math.min(trunkSegments-1,Math.floor(scaled));
+  const f=scaled-i;
+  return trunkPoints[i].clone().lerp(trunkPoints[i+1],f);
+}
+
+function makeLeafCluster(parent,center,scale,seed=0,locked=false,extraCount=0,sizeBoost=1){
+  const count=5+seed%3+extraCount;
+  for(let j=0;j<count;j++){
+    const angle=(j/count)*Math.PI*2+seed*.7;
+    const offset=new THREE.Vector3(
+      Math.cos(angle)*scale*.7,
+      (Math.sin(angle*1.7)*.34+(j%2)*.16)*scale,
+      Math.sin(angle)*scale*.52
+    );
+    const mat=leafMats[(j+seed)%leafMats.length].clone();
+    if(locked){mat.transparent=true;mat.opacity=.16;}
+    const mesh=new THREE.Mesh(new THREE.IcosahedronGeometry(scale*sizeBoost*(.42+Math.random()*.18),0),mat);
+    mesh.position.copy(center).add(offset);
+    mesh.scale.set(1.2,.8+Math.random()*.35,.9);
+    mesh.rotation.set(Math.random(),Math.random(),Math.random());
+    mesh.castShadow=true;
+    parent.add(mesh);
+  }
+}
+function makeBlossoms(parent,center,scale,seed=0,locked=false){
+  const count=8+seed%5;
+  for(let j=0;j<count;j++){
+    const a=(j/count)*Math.PI*2+seed;
+    const rr=scale*(.5+Math.random()*.7);
+    const mat=blossomMats[(j+seed)%blossomMats.length].clone();
+    if(locked){mat.transparent=true;mat.opacity=.12;}
+    const flower=new THREE.Mesh(new THREE.OctahedronGeometry(scale*(.09+Math.random()*.045),0),mat);
+    flower.position.copy(center).add(new THREE.Vector3(
+      Math.cos(a)*rr,
+      (Math.random()-.35)*scale*.8,
+      Math.sin(a)*rr*.72
+    ));
+    flower.rotation.set(Math.random(),Math.random(),Math.random());
+    flower.castShadow=true;
+    parent.add(flower);
+  }
+}
+
+function makePhotoData(index){
+  const palette=[
+    ["#41617f","#cc91ac","#f1d9bd"],
+    ["#2d455f","#b57f9b","#f9e5cb"],
+    ["#607d71","#dfa7be","#f0dec6"],
+    ["#3b516c","#c98fa8","#f5d7ba"]
+  ][index%4];
+  const c=document.createElement("canvas");
+  c.width=768;c.height=560;
+  const g=c.getContext("2d");
+  const grad=g.createLinearGradient(0,0,c.width,c.height);
+  grad.addColorStop(0,palette[0]);grad.addColorStop(.58,palette[1]);grad.addColorStop(1,palette[2]);
+  g.fillStyle=grad;g.fillRect(0,0,c.width,c.height);
+  g.fillStyle="rgba(255,255,255,.13)";
+  g.beginPath();g.arc(160+(index%4)*115,130+(index%3)*55,125,0,Math.PI*2);g.fill();
+  g.fillStyle="rgba(23,38,42,.34)";
+  g.beginPath();g.moveTo(0,460);g.quadraticCurveTo(170,330,350,440);g.quadraticCurveTo(560,550,768,390);g.lineTo(768,560);g.lineTo(0,560);g.fill();
+  g.fillStyle="rgba(255,255,255,.88)";
+  g.font="36px Georgia";g.fillText("nossa memória",42,70);
+  g.fillStyle="rgba(255,255,255,.24)";
+  g.font="bold 135px Georgia";g.fillText(String(index+1).padStart(2,"0"),42,505);
+  return c;
+}
+
+// Nomes e extensões conferidos em src/fotos. O mapeamento é deliberadamente estático.
+const PHOTO_URLS={
+  0:"src/fotos/0.jpeg",1:"src/fotos/1.jpeg",2:"src/fotos/2.jpeg",3:"src/fotos/3.jpeg",
+  4:"src/fotos/4.jpeg",5:"src/fotos/5.jpeg",6:"src/fotos/6.jpeg",7:"src/fotos/7.jpeg",
+  8:"src/fotos/8.jpeg",9:"src/fotos/9.jpeg",10:"src/fotos/10.jpeg",11:"src/fotos/11.jpeg",
+  12:"src/fotos/12.jpeg",13:"src/fotos/13.jpeg",14:"src/fotos/14.jpeg",15:"src/fotos/15.jpeg",
+  16:"src/fotos/16.jpeg",17:"src/fotos/17.jpeg",18:"src/fotos/18.jpeg",19:"src/fotos/19.jpeg",
+  20:"src/fotos/20.jpeg",21:"src/fotos/21.jpeg",22:"src/fotos/22.jpeg",23:"src/fotos/23.jpeg"
+};
+const photoImages=new Map();
+const photoTextures=new Map();
+const fallbackPhotoUrls=new Map();
+const warnedPhotoFallbacks=new Set();
+let photosReady=false;
+
+function fallbackPhotoUrl(index){
+  if(!fallbackPhotoUrls.has(index)){
+    fallbackPhotoUrls.set(index,makePhotoData(index).toDataURL("image/jpeg",.9));
+  }
+  return fallbackPhotoUrls.get(index);
+}
+function preloadPhoto(index){
+  const src=PHOTO_URLS[index];
+  if(!src)return Promise.resolve(null);
+  return new Promise(resolve=>{
+    const image=new Image();
+    image.decoding="async";
+    image.onload=async()=>{
+      try{await image.decode?.();}catch(_){/* a imagem já pode ser usada */}
+      photoImages.set(index,image);
+      resolve(image);
+    };
+    image.onerror=()=>{
+      photoImages.set(index,null);
+      warnedPhotoFallbacks.add(index);
+      console.warn(`Não foi possível carregar a foto ${index}: ${src}. Usando o fallback deste card.`);
+      resolve(null);
+    };
+    image.src=src;
+  });
+}
+function photoUrl(index){
+  return photoImages.get(index)?.currentSrc||photoImages.get(index)?.src||fallbackPhotoUrl(index);
+}
+function drawCover(context,source,width,height,scaleBoost=1){
+  const sourceWidth=source.naturalWidth||source.width;
+  const sourceHeight=source.naturalHeight||source.height;
+  const scale=Math.max(width/sourceWidth,height/sourceHeight)*scaleBoost;
+  const drawWidth=sourceWidth*scale;
+  const drawHeight=sourceHeight*scale;
+  context.drawImage(source,(width-drawWidth)/2,(height-drawHeight)/2,drawWidth,drawHeight);
+}
+function drawContain(context,source,width,height){
+  const sourceWidth=source.naturalWidth||source.width;
+  const sourceHeight=source.naturalHeight||source.height;
+  const scale=Math.min(width/sourceWidth,height/sourceHeight);
+  const drawWidth=sourceWidth*scale;
+  const drawHeight=sourceHeight*scale;
+  context.drawImage(source,(width-drawWidth)/2,(height-drawHeight)/2,drawWidth,drawHeight);
+}
+function photoTexture(index){
+  if(photoTextures.has(index))return photoTextures.get(index);
+  const source=photoImages.get(index);
+  if(!source&&!warnedPhotoFallbacks.has(index)){
+    warnedPhotoFallbacks.add(index);
+    console.warn(`Prévia 3D da foto ${index} indisponível (${PHOTO_URLS[index]||"sem arquivo mapeado"}). Usando fallback.`);
+  }
+  const previewSource=source||makePhotoData(index);
+  const textureCanvas=document.createElement("canvas");
+  textureCanvas.width=768;
+  textureCanvas.height=560;
+  const context=textureCanvas.getContext("2d");
+  context.fillStyle="#241d26";
+  context.fillRect(0,0,textureCanvas.width,textureCanvas.height);
+  context.save();
+  context.filter="blur(28px) brightness(.55) saturate(.9)";
+  drawCover(context,previewSource,textureCanvas.width,textureCanvas.height,1.15);
+  context.restore();
+  const vignette=context.createRadialGradient(
+    textureCanvas.width/2,textureCanvas.height/2,textureCanvas.height*.12,
+    textureCanvas.width/2,textureCanvas.height/2,textureCanvas.width*.7
+  );
+  vignette.addColorStop(0,"rgba(20,12,21,0)");
+  vignette.addColorStop(1,"rgba(20,12,21,.3)");
+  context.fillStyle=vignette;
+  context.fillRect(0,0,textureCanvas.width,textureCanvas.height);
+  drawContain(context,previewSource,textureCanvas.width,textureCanvas.height);
+  const texture=new THREE.CanvasTexture(textureCanvas);
+  texture.colorSpace=THREE.SRGBColorSpace;
+  texture.minFilter=THREE.LinearFilter;
+  texture.magFilter=THREE.LinearFilter;
+  texture.generateMipmaps=false;
+  texture.needsUpdate=true;
+  photoTextures.set(index,texture);
+  return texture;
+}
+function applyCardPhoto(index){
+  const fallback=()=>{
+    photoImages.set(index,null);
+    const texture=photoTextures.get(index);
+    texture?.dispose();
+    photoTextures.delete(index);
+    const src=fallbackPhotoUrl(index);
+    cardImageBackground.src=src;
+    cardImage.src=src;
+  };
+  const src=photoUrl(index);
+  cardImageBackground.onerror=fallback;
+  cardImage.onerror=fallback;
+  cardImageBackground.src=src;
+  cardImage.src=src;
+}
+const photoPreloadPromise=Promise.all(Object.keys(PHOTO_URLS).map(Number).map(preloadPhoto));
+
+const interactives=[];
+const branches=[];
+let canopyGroup=null;
+
+function buildBranches(){
+  branches.forEach(b=>tree.remove(b.group));
+  if(canopyGroup)tree.remove(canopyGroup);
+  canopyGroup=null;
+  branches.length=0;
+  interactives.length=0;
+  const countNow=unlockedCount();
+  rebuildTrunkGrowth(countNow);
+
+  MEM.forEach((memory,index)=>{
+    const t=.075+index*(.865/(MEM.length-1));
+    const base=trunkPointAt(t);
+    const side=index%2===0?-1:1;
+    const depth=((index%5)-2)*.48;
+    const local=new THREE.Group();
+    local.position.copy(base);
+    tree.add(local);
+
+    const unlocked=demoMode||index<countNow;
+    const isNext=!demoMode && index===countNow;
+    const ageFactor=ageFactorFor(index,countNow);
+    local.visible=unlocked||isNext;
+
+    const maturityProfile=unlocked ? ageFactor : Math.max(0,1-(index/(MEM.length-1)));
+    const length=4.05+(index%4)*.22+maturityProfile*3.15;
+    const rise=.54+(index%3)*.12+maturityProfile*.22;
+    const p0=new THREE.Vector3(0,0,0);
+    const p1=new THREE.Vector3(side*(length*.30),rise,depth*.30);
+    const p2=new THREE.Vector3(side*(length*.67),1.02+(index%2)*.22+maturityProfile*.34,depth);
+    const p3=new THREE.Vector3(side*length,1.18+(index%3)*.12+maturityProfile*.42,depth+side*.22);
+
+    const seg1=cylinderBetween(p0,p1,.24+maturityProfile*.22,.17+maturityProfile*.12,woodMat,6);
+    const seg2=cylinderBetween(p1,p2,.17+maturityProfile*.12,.11+maturityProfile*.07,woodMat,6);
+    const seg3=cylinderBetween(p2,p3,.11+maturityProfile*.07,.05+maturityProfile*.02,woodMat,6);
+    local.add(seg1,seg2,seg3);
+
+    const branchHitMeshes=[];
+    if(unlocked){
+      const hit1=cylinderBetween(p0,p1,.48+maturityProfile*.16,.38+maturityProfile*.12,branchHitMat,6);
+      const hit2=cylinderBetween(p1,p2,.42+maturityProfile*.14,.32+maturityProfile*.10,branchHitMat,6);
+      const hit3=cylinderBetween(p2,p3,.36+maturityProfile*.12,.26+maturityProfile*.08,branchHitMat,6);
+      [hit1,hit2,hit3].forEach(hit=>{
+        hit.userData.index=index;
+        hit.userData.kind="branch";
+        branchHitMeshes.push(hit);
+        local.add(hit);
+        interactives.push(hit);
+      });
+    }
+
+    const twigA=p2.clone().lerp(p3,.5);
+    const twigB=twigA.clone().add(new THREE.Vector3(side*(.62+maturityProfile*.24),.72+maturityProfile*.18,-side*.42));
+    local.add(cylinderBetween(twigA,twigB,.07+maturityProfile*.03,.022,woodDarkMat,5));
+
+    const foliageCenter=p3.clone().add(new THREE.Vector3(-side*.15,.58+maturityProfile*.12,0));
+    const foliageExtra=unlocked ? Math.round(maturityProfile*4) : 0;
+    const foliageBoost=unlocked ? 1+maturityProfile*.78 : 1;
+    const twigExtra=unlocked ? Math.round(maturityProfile*2) : 0;
+    makeLeafCluster(local,foliageCenter,1.18+(maturityProfile*.26),index,!unlocked,foliageExtra,foliageBoost);
+    makeLeafCluster(local,twigB,.76+(maturityProfile*.12),index+4,!unlocked,twigExtra,1+(maturityProfile*.34));
+    if(unlocked && maturityProfile>.28){
+      const olderClusterPos=p2.clone().lerp(p3,.36).add(new THREE.Vector3(-side*.14,.44,.06));
+      makeLeafCluster(local,olderClusterPos,.74+(maturityProfile*.18),index+11,false,1+Math.round(maturityProfile*2),1+(maturityProfile*.26));
+    }
+    if(unlocked && maturityProfile>.62){
+      const lowerCanopyPos=p1.clone().lerp(p2,.42).add(new THREE.Vector3(-side*.08,.28,0));
+      makeLeafCluster(local,lowerCanopyPos,.82,index+18,false,1,1+(maturityProfile*.18));
+    }
+    makeBlossoms(local,foliageCenter,1.14+(maturityProfile*.16),index,!unlocked);
+
+    if(unlocked){
+      const frame=new THREE.Group();
+      const frameHeight=1.5+maturityProfile*0.65;
+      const framePosition=p3.clone().add(new THREE.Vector3(side*.52,frameHeight,.95));
+      frame.position.copy(framePosition);
+      frame.rotation.y=side<0?.10:-.10;
+
+      const supportStart=p3.clone().add(new THREE.Vector3(0,.34,.03));
+      const supportEnd=framePosition.clone().add(new THREE.Vector3(0,-.96,-.08));
+      const supportTwig=cylinderBetween(
+        supportStart,
+        supportEnd,
+        .055+maturityProfile*.018,
+        .025,
+        woodDarkMat,
+        5
+      );
+      local.add(supportTwig);
+
+      const backingDepth=.16;
+      const frameMat=new THREE.MeshStandardMaterial({color:0xf7e8d4,roughness:.72,metalness:0,flatShading:true});
+      const backing=new THREE.Mesh(new THREE.BoxGeometry(2.58,1.94,backingDepth),frameMat);
+      backing.castShadow=true;
+      backing.userData.index=index;
+      backing.userData.kind="card";
+      frame.add(backing);
+
+      const texture=photoTexture(index);
+      const photoMat=new THREE.MeshBasicMaterial({
+        map:texture,toneMapped:false,side:THREE.DoubleSide,
+        polygonOffset:true,polygonOffsetFactor:-1,polygonOffsetUnits:-1
+      });
+      photoMat.needsUpdate=true;
+      const photo=new THREE.Mesh(new THREE.PlaneGeometry(2.34,1.67),photoMat);
+      photo.name=`preview-foto-${index}`;
+      photo.position.z=backingDepth/2+.018;
+      photo.renderOrder=2;
+      photo.visible=true;
+      photo.userData.index=index;
+      photo.userData.kind="photo";
+      frame.add(photo);
+
+      const pinMat=new THREE.MeshStandardMaterial({color:index===24?0xffdca4:0xffa7c9,roughness:.55,emissive:index===24?0x5b3512:0x3a0e22,emissiveIntensity:.28});
+      const pin=new THREE.Mesh(new THREE.OctahedronGeometry(.14,0),pinMat);
+      pin.position.set(0,.98,.12);
+      pin.userData.index=index;
+      pin.userData.kind="pin";
+      frame.add(pin);
+
+      local.add(frame);
+      backing.userData.hoverTarget=frame;
+      photo.userData.hoverTarget=frame;
+      pin.userData.hoverTarget=frame;
+      supportTwig.userData.index=index;
+      supportTwig.userData.kind="support";
+      supportTwig.userData.hoverTarget=frame;
+      branchHitMeshes.forEach(hit=>hit.userData.hoverTarget=frame);
+      interactives.push(backing,photo,pin,supportTwig);
+      branches.push({group:local,index,t,unlocked,frame,photo,materials:[],targetScale:1,ageFactor});
+    }else{
+      const budMat=new THREE.MeshStandardMaterial({
+        color:0x9e5875,roughness:.9,flatShading:true,transparent:true,opacity:.42
+      });
+      const bud=new THREE.Mesh(new THREE.OctahedronGeometry(.28,0),budMat);
+      bud.position.copy(p3).add(new THREE.Vector3(0,.7,0));
+      local.add(bud);
+      branches.push({group:local,index,t,unlocked:false,frame:null,photo:null,materials:[budMat],targetScale:.72,ageFactor:0});
+    }
+
+    local.scale.setScalar(unlocked?.82:.72);
+    local.userData.baseScale=unlocked?1:.72;
+  });
+
+  // copa final para remover aparência de “poste”
+  canopyGroup=new THREE.Group();
+  const top=trunkPointAt(.96);
+  canopyGroup.position.copy(top);
+  tree.add(canopyGroup);
+  [
+    [-2.3,1.4,.1,2.0],[0,2.0,-.2,2.35],[2.4,1.3,.2,2.0],
+    [-1.35,3.0,-.5,1.72],[1.4,3.1,-.2,1.8],[0,4.1,.1,1.55]
+  ].forEach((v,i)=>{
+    const c=new THREE.Vector3(v[0],v[1],v[2]);
+    makeLeafCluster(canopyGroup,c,v[3],30+i,false);
+    makeBlossoms(canopyGroup,c,v[3],40+i,false);
+  });
+  canopyGroup.userData.permanent=true;
+}
+function refreshBranches(){
+  if(photosReady)buildBranches();
+}
+
+photoPreloadPromise.then(()=>{
+  photosReady=true;
+  buildBranches();
+  if(modal.classList.contains("open"))applyCardPhoto(Number(modal.dataset.memoryIndex));
+});
+
+// discretos arbustos na base
+for(let i=0;i<13;i++){
+  const a=(i/13)*Math.PI*2;
+  const group=new THREE.Group();
+  group.position.set(Math.cos(a)*(5.3+Math.random()*2),0,Math.sin(a)*(4.2+Math.random()*2));
+  makeLeafCluster(group,new THREE.Vector3(),.75,i,false);
+  scene.add(group);
+}
+
+// pétalas 3D
+const petalGeo=new THREE.OctahedronGeometry(.055,0);
+const petalMat=new THREE.MeshBasicMaterial({color:0xffb6d2,transparent:true,opacity:.68});
+const petalCount=90;
+const petals=new THREE.InstancedMesh(petalGeo,petalMat,petalCount);
+const dummy=new THREE.Object3D();
+const petalData=[];
+for(let i=0;i<petalCount;i++){
+  petalData.push({
+    x:(Math.random()-.5)*22,
+    y:Math.random()*64,
+    z:(Math.random()-.5)*18,
+    speed:.018+Math.random()*.035,
+    drift:(Math.random()-.5)*.008,
+    rot:Math.random()*6.28
+  });
+}
+scene.add(petals);
+
+const raycaster=new THREE.Raycaster();
+const pointer=new THREE.Vector2(9,9);
+
+function pointerFromEvent(e){
+  pointer.x=(e.clientX/innerWidth)*2-1;
+  pointer.y=-(e.clientY/innerHeight)*2+1;
+}
+canvas.addEventListener("pointermove",e=>{
+  pointerFromEvent(e);
+});
+canvas.addEventListener("pointerleave",()=>{
+  pointer.set(9,9);
+  hovered=null;
+  canvas.style.cursor="default";
+});
+canvas.addEventListener("click",e=>{
+  pointerFromEvent(e);
+  raycaster.setFromCamera(pointer,camera);
+  const hit=raycaster.intersectObjects(interactives,false)[0];
+  if(hit)openMemory(hit.object.userData.index);
+});
+
+function updateScroll(){
+  const max=document.documentElement.scrollHeight-innerHeight;
+  scrollProgress=max>0?scrollY/max:0;
+  progressFill.style.height=`${Math.max(1,scrollProgress*100)}%`;
+  const track=document.querySelector(".progress").getBoundingClientRect();
+  progressDot.style.top=`${track.top+scrollProgress*track.height}px`;
+  scrollHint.classList.toggle("hide",scrollY>100);
+}
+addEventListener("scroll",updateScroll,{passive:true});
+addEventListener("wheel",e=>{
+  if(!e.deltaY) return;
+  e.preventDefault();
+  const delta=e.deltaMode===1?e.deltaY*16:e.deltaY;
+  window.scrollBy({top:-delta,left:0});
+},{passive:false});
+
+const chapters=[
+  {from:0,to:.17,eye:"02–05 de julho · raízes",title:"Foi aqui que a saudade começou.",text:"Os primeiros dias ainda ficam perto do chão."},
+  {from:.17,to:.39,eye:"06–11 de julho · primeiros galhos",title:"A árvore aprende a guardar lembranças.",text:"Cada ramo traz uma foto e uma pequena carta."},
+  {from:.39,to:.60,eye:"12–17 de julho · meio do caminho",title:"A espera começa a florescer.",text:"A copa fica mais cheia e o reencontro menos distante."},
+  {from:.60,to:.83,eye:"18–23 de julho · copa alta",title:"Agora os dias cabem nas mãos.",text:"A câmera sobe, o céu clareia e a árvore ganha cor."},
+  {from:.83,to:1.01,eye:"24–26 de julho · reencontro",title:"No topo, a saudade vira abraço.",text:"A última fotografia espera na parte mais florida da copa."}
+];
+function updateChapter(){
+  const c=chapters.find(x=>scrollProgress>=x.from&&scrollProgress<x.to)||chapters.at(-1);
+  chapterEyebrow.textContent=c.eye;
+  chapterTitle.textContent=c.title;
+  chapterText.textContent=c.text;
+}
+
+function smoothstep(a,b,x){
+  const t=THREE.MathUtils.clamp((x-a)/(b-a),0,1);
+  return t*t*(3-2*t);
+}
+
+function animate(time=0){
+  requestAnimationFrame(animate);
+  const targetY=3.4+scrollProgress*57.2;
+  const smoothing=reducedMotion?.18:.055;
+  currentCameraY=THREE.MathUtils.lerp(currentCameraY,targetY,smoothing);
+
+  const orbit=reducedMotion?0:Math.sin(scrollProgress*Math.PI*2.25)*2.15;
+  const orbitZ=reducedMotion?15.8:15.3+Math.sin(scrollProgress*Math.PI*3.1)*1.05;
+  camera.position.x=THREE.MathUtils.lerp(camera.position.x,orbit,.04);
+  camera.position.y=currentCameraY;
+  camera.position.z=THREE.MathUtils.lerp(camera.position.z,orbitZ,.04);
+
+  const lookY=currentCameraY+1.05;
+  const trunkTarget=trunkPointAt(THREE.MathUtils.clamp(lookY/TREE_TOP,0,1));
+  camera.lookAt(trunkTarget.x*.4,lookY,trunkTarget.z*.4);
+
+  branches.forEach(branch=>{
+    const target=branch.targetScale;
+    const easing=branch.unlocked ? (reducedMotion?.18:.07) : .14;
+    const s=THREE.MathUtils.lerp(branch.group.scale.x,target,easing);
+    branch.group.scale.setScalar(s);
+
+    if(branch.frame){
+      branch.frame.lookAt(camera.position);
+    }
+  });
+
+  raycaster.setFromCamera(pointer,camera);
+  const hit=raycaster.intersectObjects(interactives,false)[0];
+  const nextHit=hit?.object||null;
+  const nextHover=nextHit?.userData?.hoverTarget||nextHit;
+  if(nextHover!==hovered){
+    if(hovered)hovered.scale.setScalar(1);
+    hovered=nextHover;
+    if(hovered)hovered.scale.setScalar(1.045);
+    canvas.style.cursor=nextHit?"pointer":"default";
+  }
+
+  petals.rotation.y=time*.000015;
+  for(let i=0;i<petalCount;i++){
+    const p=petalData[i];
+    p.y-=p.speed;
+    p.x+=Math.sin(time*.0005+i)*.002+p.drift;
+    p.rot+=.01;
+    if(p.y<-1){
+      p.y=64+Math.random()*5;
+      p.x=(Math.random()-.5)*22;
+      p.z=(Math.random()-.5)*18;
+    }
+    dummy.position.set(p.x,p.y,p.z);
+    dummy.rotation.set(p.rot,p.rot*.6,p.rot*.3);
+    const sc=.72+(i%4)*.12;
+    dummy.scale.set(sc*.65,sc*1.25,sc);
+    dummy.updateMatrix();
+    petals.setMatrixAt(i,dummy.matrix);
+  }
+  petals.instanceMatrix.needsUpdate=true;
+
+  pinkLight.position.y=25+Math.sin(time*.00035)*3;
+  updateChapter();
+
+  const maxUnlockedT=.075+Math.max(0,unlockedCount()-1)*(.865/(MEM.length-1));
+  lockedNote.classList.toggle("show",!demoMode&&scrollProgress>maxUnlockedT+.07);
+
+  renderer.render(scene,camera);
+}
+
+function openMemory(index){
+  const m=MEM[index];
+  modal.dataset.memoryIndex=index;
+  applyCardPhoto(index);
+  cardImage.alt=`Fotografia da memória de ${fmt(m[0])}`;
+  cardCaption.textContent=`${fmt(m[0])} · memória ${String(index+1).padStart(2,"0")}`;
+  cardDate.textContent=`galho ${String(index+1).padStart(2,"0")} · ${fmt(m[0])}`;
+  cardTitle.textContent=m[1];
+  cardText.textContent=m[2];
+  modal.classList.add("open");
+  document.body.style.overflow="hidden";
+  if(soundOn)chime(index===24);
+}
+function closeMemory(){
+  modal.classList.remove("open");
+  document.body.style.overflow="";
+}
+closeModal.addEventListener("click",closeMemory);
+modal.addEventListener("click",e=>{if(e.target===modal)closeMemory()});
+addEventListener("keydown",e=>{if(e.key==="Escape")closeMemory()});
+
+function showToast(text){
+  toast.textContent=text;
+  toast.classList.add("show");
+  clearTimeout(showToast.t);
+  showToast.t=setTimeout(()=>toast.classList.remove("show"),2300);
+}
+enterBtn.addEventListener("click",()=>intro.classList.add("hide"));
+demoIntroBtn.addEventListener("click",()=>{
+  demoMode=true;
+  demoToggle.checked=true;
+  refreshBranches();
+  intro.classList.add("hide");
+});
+settingsBtn.addEventListener("click",()=>settings.classList.toggle("open"));
+document.addEventListener("click",e=>{
+  if(!settings.contains(e.target)&&!settingsBtn.contains(e.target))settings.classList.remove("open");
+});
+demoToggle.addEventListener("change",()=>{
+  demoMode=demoToggle.checked;
+  refreshBranches();
+  showToast(demoMode?"Os 25 galhos foram liberados.":"Datas reais restauradas.");
+});
+motionToggle.addEventListener("change",()=>{
+  reducedMotion=motionToggle.checked;
+  showToast(reducedMotion?"Movimento da câmera reduzido.":"Movimento cinematográfico restaurado.");
+});
+
+function ensureAudio(){
+  if(!audioCtx)audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+}
+function tone(freq,delay=0,duration=1.35,gainValue=.015){
+  ensureAudio();
+  const t=audioCtx.currentTime+delay;
+  const osc=audioCtx.createOscillator();
+  const gain=audioCtx.createGain();
+  osc.type="sine";osc.frequency.value=freq;
+  gain.gain.setValueAtTime(.0001,t);
+  gain.gain.exponentialRampToValueAtTime(gainValue,t+.05);
+  gain.gain.exponentialRampToValueAtTime(.0001,t+duration);
+  osc.connect(gain);gain.connect(audioCtx.destination);
+  osc.start(t);osc.stop(t+duration+.08);
+}
+function chime(final=false){
+  const notes=final?[261.63,329.63,392,523.25,659.25]:[293.66,369.99,440];
+  notes.forEach((f,i)=>tone(f,i*.1,1.35,.014));
+}
+soundBtn.addEventListener("click",()=>{
+  soundOn=!soundOn;
+  soundBtn.textContent=soundOn?"♫":"♪";
+  if(soundOn){
+    backgroundAudio.currentTime=0;
+    backgroundAudio.play().catch(()=>{
+      showToast("Não foi possível iniciar o áudio agora.");
+    });
+    chime(false);
+  } else {
+    backgroundAudio.pause();
+  }
+  showToast(soundOn?"Som leve ativado.":"Som desativado.");
+});
+
+function onResize(){
+  renderer.setPixelRatio(Math.min(1.75,window.devicePixelRatio||1));
+  renderer.setSize(innerWidth,innerHeight,false);
+  camera.aspect=innerWidth/innerHeight;
+  camera.updateProjectionMatrix();
+}
+addEventListener("resize",onResize);
+
+updateScroll();
+animate();
+window.__treeReady=true;
+$("#loadingError").classList.remove("show");
+</script>
+</body>
+</html>
