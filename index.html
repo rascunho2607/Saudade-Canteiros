@@ -445,6 +445,26 @@ let audioCtx=null;
 let scrollProgress=0;
 let currentCameraY=3.8;
 let hovered=null;
+let IS_TOUCH=window.matchMedia("(pointer: coarse)").matches;
+let IS_MOBILE=IS_TOUCH||window.innerWidth<=820;
+let MOBILE_LOW=IS_MOBILE&&window.innerWidth<=560;
+
+function getPerformanceProfile(){
+  const pixelRatio=MOBILE_LOW?.85:(IS_MOBILE?1:Math.min(1.75,window.devicePixelRatio||1));
+  return {
+    pixelRatio,
+    antialias:!IS_MOBILE,
+    shadows:!IS_MOBILE,
+    shadowMapSize:IS_MOBILE?0:1024,
+    targetFps:IS_MOBILE?30:0,
+    starsCount:MOBILE_LOW?120:(IS_MOBILE?225:500),
+    petalCount:MOBILE_LOW?20:(IS_MOBILE?36:90),
+    previewWidth:IS_MOBILE?384:768,
+    previewHeight:IS_MOBILE?280:560,
+    branchRenderDistance:MOBILE_LOW?20:(IS_MOBILE?25:Infinity)
+  };
+}
+let performanceProfile=getPerformanceProfile();
 
 function dateKey(){
   const parts=new Intl.DateTimeFormat("en-GB",{
@@ -470,16 +490,16 @@ function ageFactorFor(index,countNow=unlockedCount()){
 
 const renderer=new THREE.WebGLRenderer({
   canvas,
-  antialias:true,
+  antialias:performanceProfile.antialias,
   alpha:false,
   powerPreference:"high-performance"
 });
-renderer.setPixelRatio(Math.min(1.75,window.devicePixelRatio||1));
+renderer.setPixelRatio(performanceProfile.pixelRatio);
 renderer.setSize(innerWidth,innerHeight,false);
 renderer.outputColorSpace=THREE.SRGBColorSpace;
 renderer.toneMapping=THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure=1.12;
-renderer.shadowMap.enabled=true;
+renderer.shadowMap.enabled=performanceProfile.shadows;
 renderer.shadowMap.type=THREE.PCFShadowMap;
 
 const scene=new THREE.Scene();
@@ -495,13 +515,13 @@ const initialCameraProfile=cameraProfile();
 const camera=new THREE.PerspectiveCamera(initialCameraProfile.fov,innerWidth/innerHeight,.1,160);
 camera.position.set(0,3.8,initialCameraProfile.baseZ);
 
-const hemi=new THREE.HemisphereLight(0xbfd9ff,0x283629,1.55);
+const hemi=new THREE.HemisphereLight(0xbfd9ff,0x283629,IS_MOBILE?1.82:1.55);
 scene.add(hemi);
 
 const key=new THREE.DirectionalLight(0xffe6d2,2.4);
 key.position.set(8,22,12);
-key.castShadow=true;
-key.shadow.mapSize.set(1024,1024);
+key.castShadow=performanceProfile.shadows;
+key.shadow.mapSize.set(performanceProfile.shadowMapSize||1,performanceProfile.shadowMapSize||1);
 key.shadow.camera.left=-18;
 key.shadow.camera.right=18;
 key.shadow.camera.top=30;
@@ -515,13 +535,15 @@ scene.add(pinkLight);
 const moonLight=new THREE.PointLight(0xb8d5ff,10,40,2);
 moonLight.position.set(9,49,-3);
 scene.add(moonLight);
+pinkLight.visible=!IS_MOBILE;
+moonLight.visible=!IS_MOBILE;
 
 const groundMat=new THREE.MeshStandardMaterial({
   color:0x20342d,roughness:1,metalness:0,flatShading:true
 });
 const ground=new THREE.Mesh(new THREE.CylinderGeometry(8.5,10.5,1.1,10),groundMat);
 ground.position.y=-.75;
-ground.receiveShadow=true;
+ground.receiveShadow=performanceProfile.shadows;
 scene.add(ground);
 
 const baseRockMat=new THREE.MeshStandardMaterial({color:0x314039,roughness:1,flatShading:true});
@@ -532,25 +554,29 @@ for(let i=0;i<14;i++){
   rock.position.set(Math.cos(a)*(6.5+Math.random()*2),-.05+Math.random()*.25,Math.sin(a)*(5+Math.random()*2));
   rock.rotation.set(Math.random(),Math.random(),Math.random());
   rock.scale.y=.55+Math.random()*.45;
-  rock.castShadow=true;
+  rock.castShadow=performanceProfile.shadows;
   scene.add(rock);
 }
 
-const starsGeo=new THREE.BufferGeometry();
-const starsCount=500;
-const positions=new Float32Array(starsCount*3);
-for(let i=0;i<starsCount;i++){
-  const a=Math.random()*Math.PI*2;
-  const radius=28+Math.random()*45;
-  positions[i*3]=Math.cos(a)*radius;
-  positions[i*3+1]=Math.random()*72;
-  positions[i*3+2]=Math.sin(a)*radius-15;
+let stars=null;
+function buildStars(){
+  if(stars){scene.remove(stars);stars.geometry.dispose();stars.material.dispose();}
+  const starsGeo=new THREE.BufferGeometry();
+  const positions=new Float32Array(performanceProfile.starsCount*3);
+  for(let i=0;i<performanceProfile.starsCount;i++){
+    const a=Math.random()*Math.PI*2;
+    const radius=28+Math.random()*45;
+    positions[i*3]=Math.cos(a)*radius;
+    positions[i*3+1]=Math.random()*72;
+    positions[i*3+2]=Math.sin(a)*radius-15;
+  }
+  starsGeo.setAttribute("position",new THREE.BufferAttribute(positions,3));
+  stars=new THREE.Points(starsGeo,new THREE.PointsMaterial({
+    color:0xfff2e5,size:.08,transparent:true,opacity:.58,sizeAttenuation:true
+  }));
+  scene.add(stars);
 }
-starsGeo.setAttribute("position",new THREE.BufferAttribute(positions,3));
-const stars=new THREE.Points(starsGeo,new THREE.PointsMaterial({
-  color:0xfff2e5,size:.08,transparent:true,opacity:.58,sizeAttenuation:true
-}));
-scene.add(stars);
+buildStars();
 
 const tree=new THREE.Group();
 scene.add(tree);
@@ -587,8 +613,8 @@ function cylinderBetween(a,b,r1,r2,material,radial=7){
   const mesh=new THREE.Mesh(geo,material);
   mesh.position.copy(a).add(b).multiplyScalar(.5);
   mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),delta.clone().normalize());
-  mesh.castShadow=true;
-  mesh.receiveShadow=true;
+  mesh.castShadow=performanceProfile.shadows;
+  mesh.receiveShadow=performanceProfile.shadows;
   return mesh;
 }
 
@@ -664,13 +690,14 @@ function makeLeafCluster(parent,center,scale,seed=0,locked=false,extraCount=0,si
       (Math.sin(angle*1.7)*.34+(j%2)*.16)*scale,
       Math.sin(angle)*scale*.52
     );
-    const mat=leafMats[(j+seed)%leafMats.length].clone();
+    const baseMat=leafMats[(j+seed)%leafMats.length];
+    const mat=locked||!IS_MOBILE?baseMat.clone():baseMat;
     if(locked){mat.transparent=true;mat.opacity=.16;}
     const mesh=new THREE.Mesh(new THREE.IcosahedronGeometry(scale*sizeBoost*(.42+Math.random()*.18),0),mat);
     mesh.position.copy(center).add(offset);
     mesh.scale.set(1.2,.8+Math.random()*.35,.9);
     mesh.rotation.set(Math.random(),Math.random(),Math.random());
-    mesh.castShadow=true;
+    mesh.castShadow=performanceProfile.shadows;
     parent.add(mesh);
   }
 }
@@ -679,7 +706,8 @@ function makeBlossoms(parent,center,scale,seed=0,locked=false){
   for(let j=0;j<count;j++){
     const a=(j/count)*Math.PI*2+seed;
     const rr=scale*(.5+Math.random()*.7);
-    const mat=blossomMats[(j+seed)%blossomMats.length].clone();
+    const baseMat=blossomMats[(j+seed)%blossomMats.length];
+    const mat=locked||!IS_MOBILE?baseMat.clone():baseMat;
     if(locked){mat.transparent=true;mat.opacity=.12;}
     const flower=new THREE.Mesh(new THREE.OctahedronGeometry(scale*(.09+Math.random()*.045),0),mat);
     flower.position.copy(center).add(new THREE.Vector3(
@@ -688,7 +716,7 @@ function makeBlossoms(parent,center,scale,seed=0,locked=false){
       Math.sin(a)*rr*.72
     ));
     flower.rotation.set(Math.random(),Math.random(),Math.random());
-    flower.castShadow=true;
+    flower.castShadow=performanceProfile.shadows;
     parent.add(flower);
   }
 }
@@ -730,7 +758,7 @@ const photoImages=new Map();
 const photoTextures=new Map();
 const fallbackPhotoUrls=new Map();
 const warnedPhotoFallbacks=new Set();
-let photosReady=false;
+const photoPromises=new Map();
 
 function fallbackPhotoUrl(index){
   if(!fallbackPhotoUrls.has(index)){
@@ -739,14 +767,20 @@ function fallbackPhotoUrl(index){
   return fallbackPhotoUrls.get(index);
 }
 function preloadPhoto(index){
+  if(photoPromises.has(index))return photoPromises.get(index);
   const src=PHOTO_URLS[index];
-  if(!src)return Promise.resolve(null);
-  return new Promise(resolve=>{
+  if(!src){
+    const noPhoto=Promise.resolve(null);
+    photoPromises.set(index,noPhoto);
+    return noPhoto;
+  }
+  const promise=new Promise(resolve=>{
     const image=new Image();
     image.decoding="async";
     image.onload=async()=>{
       try{await image.decode?.();}catch(_){/* a imagem já pode ser usada */}
       photoImages.set(index,image);
+      refreshPhotoTexture(index);
       resolve(image);
     };
     image.onerror=()=>{
@@ -757,6 +791,8 @@ function preloadPhoto(index){
     };
     image.src=src;
   });
+  photoPromises.set(index,promise);
+  return promise;
 }
 function photoUrl(index){
   return photoImages.get(index)?.currentSrc||photoImages.get(index)?.src||fallbackPhotoUrl(index);
@@ -780,14 +816,10 @@ function drawContain(context,source,width,height){
 function photoTexture(index){
   if(photoTextures.has(index))return photoTextures.get(index);
   const source=photoImages.get(index);
-  if(!source&&!warnedPhotoFallbacks.has(index)){
-    warnedPhotoFallbacks.add(index);
-    console.warn(`Prévia 3D da foto ${index} indisponível (${PHOTO_URLS[index]||"sem arquivo mapeado"}). Usando fallback.`);
-  }
   const previewSource=source||makePhotoData(index);
   const textureCanvas=document.createElement("canvas");
-  textureCanvas.width=768;
-  textureCanvas.height=560;
+  textureCanvas.width=performanceProfile.previewWidth;
+  textureCanvas.height=performanceProfile.previewHeight;
   const context=textureCanvas.getContext("2d");
   context.fillStyle="#241d26";
   context.fillRect(0,0,textureCanvas.width,textureCanvas.height);
@@ -813,6 +845,16 @@ function photoTexture(index){
   photoTextures.set(index,texture);
   return texture;
 }
+function refreshPhotoTexture(index){
+  const oldTexture=photoTextures.get(index);
+  if(oldTexture){oldTexture.dispose();photoTextures.delete(index);}
+  const branch=branches.find(item=>item.index===index);
+  if(branch?.photo){
+    branch.photo.material.map=photoTexture(index);
+    branch.photo.material.needsUpdate=true;
+  }
+  if(modal.classList.contains("open")&&Number(modal.dataset.memoryIndex)===index)applyCardPhoto(index);
+}
 function applyCardPhoto(index){
   const fallback=()=>{
     photoImages.set(index,null);
@@ -829,7 +871,18 @@ function applyCardPhoto(index){
   cardImageBackground.src=src;
   cardImage.src=src;
 }
-const photoPreloadPromise=Promise.all(Object.keys(PHOTO_URLS).map(Number).map(preloadPhoto));
+
+function primePhotosNearCamera(){
+  const count=unlockedCount();
+  const nearIndex=Math.round(scrollProgress*(MEM.length-1));
+  const wanted=new Set();
+  for(let i=0;i<count;i++)wanted.add(i);
+  if(count<MEM.length)wanted.add(count);
+  for(let i=Math.max(0,nearIndex-2);i<=Math.min(MEM.length-1,nearIndex+2);i++){
+    if(demoMode||i<count)wanted.add(i);
+  }
+  wanted.forEach(preloadPhoto);
+}
 
 const interactives=[];
 const branches=[];
@@ -927,7 +980,7 @@ function buildBranches(){
       const backingDepth=.16;
       const frameMat=new THREE.MeshStandardMaterial({color:0xf7e8d4,roughness:.72,metalness:0,flatShading:true});
       const backing=new THREE.Mesh(new THREE.BoxGeometry(2.58,1.94,backingDepth),frameMat);
-      backing.castShadow=true;
+      backing.castShadow=performanceProfile.shadows;
       backing.userData.index=index;
       backing.userData.kind="card";
       frame.add(backing);
@@ -963,7 +1016,7 @@ function buildBranches(){
       supportTwig.userData.hoverTarget=frame;
       branchHitMeshes.forEach(hit=>hit.userData.hoverTarget=frame);
       interactives.push(backing,photo,pin,supportTwig);
-      branches.push({group:local,index,t,unlocked,frame,photo,materials:[],targetScale:1,ageFactor});
+      branches.push({group:local,index,t,unlocked,frame,photo,materials:[],targetScale:1,ageFactor,baseVisible:unlocked||isNext});
     }else{
       const budMat=new THREE.MeshStandardMaterial({
         color:0x9e5875,roughness:.9,flatShading:true,transparent:true,opacity:.42
@@ -971,7 +1024,7 @@ function buildBranches(){
       const bud=new THREE.Mesh(new THREE.OctahedronGeometry(.28,0),budMat);
       bud.position.copy(p3).add(new THREE.Vector3(0,.7,0));
       local.add(bud);
-      branches.push({group:local,index,t,unlocked:false,frame:null,photo:null,materials:[budMat],targetScale:.72,ageFactor:0});
+      branches.push({group:local,index,t,unlocked:false,frame:null,photo:null,materials:[budMat],targetScale:.72,ageFactor:0,baseVisible:isNext});
     }
 
     local.scale.setScalar(unlocked?.82:.72);
@@ -994,14 +1047,12 @@ function buildBranches(){
   canopyGroup.userData.permanent=true;
 }
 function refreshBranches(){
-  if(photosReady)buildBranches();
-}
-
-photoPreloadPromise.then(()=>{
-  photosReady=true;
   buildBranches();
-  if(modal.classList.contains("open"))applyCardPhoto(Number(modal.dataset.memoryIndex));
-});
+  if(IS_MOBILE)primePhotosNearCamera();
+}
+buildBranches();
+if(IS_MOBILE)primePhotosNearCamera();
+else Object.keys(PHOTO_URLS).map(Number).forEach(preloadPhoto);
 
 // discretos arbustos na base
 for(let i=0;i<13;i++){
@@ -1015,21 +1066,19 @@ for(let i=0;i<13;i++){
 // pétalas 3D
 const petalGeo=new THREE.OctahedronGeometry(.055,0);
 const petalMat=new THREE.MeshBasicMaterial({color:0xffb6d2,transparent:true,opacity:.68});
-const petalCount=90;
-const petals=new THREE.InstancedMesh(petalGeo,petalMat,petalCount);
 const dummy=new THREE.Object3D();
-const petalData=[];
-for(let i=0;i<petalCount;i++){
-  petalData.push({
-    x:(Math.random()-.5)*22,
-    y:Math.random()*64,
-    z:(Math.random()-.5)*18,
-    speed:.018+Math.random()*.035,
-    drift:(Math.random()-.5)*.008,
-    rot:Math.random()*6.28
-  });
+let petals=null;
+let petalData=[];
+function buildPetals(){
+  if(petals)scene.remove(petals);
+  petals=new THREE.InstancedMesh(petalGeo,petalMat,performanceProfile.petalCount);
+  petalData=[];
+  for(let i=0;i<performanceProfile.petalCount;i++){
+    petalData.push({x:(Math.random()-.5)*22,y:Math.random()*64,z:(Math.random()-.5)*18,speed:.018+Math.random()*.035,drift:(Math.random()-.5)*.008,rot:Math.random()*6.28});
+  }
+  scene.add(petals);
 }
-scene.add(petals);
+buildPetals();
 
 const raycaster=new THREE.Raycaster();
 const pointer=new THREE.Vector2(9,9);
@@ -1038,53 +1087,92 @@ function pointerFromEvent(e){
   pointer.x=(e.clientX/innerWidth)*2-1;
   pointer.y=-(e.clientY/innerHeight)*2+1;
 }
+const TOUCH_DRAG_THRESHOLD=10;
 let pointerDownPosition=null;
 let pointerDragged=false;
-canvas.addEventListener("pointerdown",e=>{
-  pointerDownPosition={x:e.clientX,y:e.clientY};
-  pointerDragged=false;
-});
-canvas.addEventListener("pointermove",e=>{
-  pointerFromEvent(e);
-  if(pointerDownPosition){
-    const dx=e.clientX-pointerDownPosition.x;
-    const dy=e.clientY-pointerDownPosition.y;
-    if(Math.hypot(dx,dy)>10)pointerDragged=true;
-  }
-});
-canvas.addEventListener("pointerup",()=>{
-  requestAnimationFrame(()=>{pointerDownPosition=null;});
-});
-canvas.addEventListener("pointercancel",()=>{
-  pointerDownPosition=null;
-  pointerDragged=false;
-});
-canvas.addEventListener("pointerleave",()=>{
-  pointer.set(9,9);
-  hovered=null;
-  canvas.style.cursor="default";
-});
-canvas.addEventListener("click",e=>{
-  if(pointerDragged){
-    pointerDragged=false;
-    return;
-  }
+let activeTouchPointerId=null;
+let touchLastY=0;
+let accumulatedTouchDelta=0;
+let touchFramePending=false;
+function applyAccumulatedTouchScroll(){
+  touchFramePending=false;
+  if(!accumulatedTouchDelta)return;
+  const max=Math.max(0,document.documentElement.scrollHeight-innerHeight);
+  const next=THREE.MathUtils.clamp(scrollY+accumulatedTouchDelta,0,max);
+  accumulatedTouchDelta=0;
+  window.scrollTo(0,next);
+  updateScroll();
+}
+function scheduleTouchScroll(){
+  if(!touchFramePending){touchFramePending=true;requestAnimationFrame(applyAccumulatedTouchScroll);}
+}
+function openMemoryAtPointer(e){
   pointerFromEvent(e);
   raycaster.setFromCamera(pointer,camera);
   const hit=raycaster.intersectObjects(interactives,false)[0];
   if(hit)openMemory(hit.object.userData.index);
+}
+canvas.addEventListener("pointerdown",e=>{
+  if(IS_TOUCH&&e.pointerType!=="mouse"){
+    activeTouchPointerId=e.pointerId;touchLastY=e.clientY;
+    pointerDownPosition={x:e.clientX,y:e.clientY};pointerDragged=false;
+    canvas.setPointerCapture?.(e.pointerId);
+    return;
+  }
+  pointerDownPosition={x:e.clientX,y:e.clientY};pointerDragged=false;
+});
+canvas.addEventListener("pointermove",e=>{
+  if(IS_TOUCH&&e.pointerId===activeTouchPointerId){
+    const deltaY=e.clientY-touchLastY;
+    touchLastY=e.clientY;
+    if(pointerDownPosition&&Math.hypot(e.clientX-pointerDownPosition.x,e.clientY-pointerDownPosition.y)>TOUCH_DRAG_THRESHOLD)pointerDragged=true;
+    if(pointerDragged){
+      accumulatedTouchDelta+=deltaY;
+      e.preventDefault();
+      scheduleTouchScroll();
+    }
+    return;
+  }
+  pointerFromEvent(e);
+  if(pointerDownPosition&&Math.hypot(e.clientX-pointerDownPosition.x,e.clientY-pointerDownPosition.y)>TOUCH_DRAG_THRESHOLD)pointerDragged=true;
+},{passive:false});
+canvas.addEventListener("pointerup",e=>{
+  if(IS_TOUCH&&e.pointerId===activeTouchPointerId){
+    if(pointerDragged)scheduleTouchScroll();else openMemoryAtPointer(e);
+    activeTouchPointerId=null;pointerDownPosition=null;pointerDragged=false;
+    return;
+  }
+  requestAnimationFrame(()=>{pointerDownPosition=null;});
+});
+canvas.addEventListener("pointercancel",e=>{
+  if(e.pointerId===activeTouchPointerId)activeTouchPointerId=null;
+  accumulatedTouchDelta=0;pointerDownPosition=null;pointerDragged=false;
+});
+canvas.addEventListener("pointerleave",()=>{
+  if(IS_TOUCH)return;
+  pointer.set(9,9);hovered=null;
+  if(canvas.style.cursor!=="default")canvas.style.cursor="default";
+});
+canvas.addEventListener("click",e=>{
+  if(IS_TOUCH||pointerDragged)return;
+  openMemoryAtPointer(e);
 });
 
 function updateScroll(){
   const max=document.documentElement.scrollHeight-innerHeight;
   scrollProgress=max>0?scrollY/max:0;
-  progressFill.style.height=`${Math.max(1,scrollProgress*100)}%`;
+  const progressHeight=`${Math.max(1,scrollProgress*100)}%`;
+  if(progressFill.style.height!==progressHeight)progressFill.style.height=progressHeight;
   const track=document.querySelector(".progress").getBoundingClientRect();
-  progressDot.style.top=`${track.top+scrollProgress*track.height}px`;
-  scrollHint.classList.toggle("hide",scrollY>100);
+  const progressTop=`${track.top+scrollProgress*track.height}px`;
+  if(progressDot.style.top!==progressTop)progressDot.style.top=progressTop;
+  const hideHint=scrollY>100;
+  if(scrollHint.classList.contains("hide")!==hideHint)scrollHint.classList.toggle("hide",hideHint);
+  if(IS_MOBILE)primePhotosNearCamera();
 }
 addEventListener("scroll",updateScroll,{passive:true});
 addEventListener("wheel",e=>{
+  if(IS_TOUCH)return;
   if(!e.deltaY)return;
   e.preventDefault();
   const delta=e.deltaMode===1?e.deltaY*16:e.deltaY;
@@ -1100,6 +1188,8 @@ const chapters=[
 ];
 function updateChapter(){
   const c=chapters.find(x=>scrollProgress>=x.from&&scrollProgress<x.to)||chapters.at(-1);
+  if(updateChapter.current===c)return;
+  updateChapter.current=c;
   chapterEyebrow.textContent=c.eye;
   chapterTitle.textContent=c.title;
   chapterText.textContent=c.text;
@@ -1110,10 +1200,15 @@ function smoothstep(a,b,x){
   return t*t*(3-2*t);
 }
 
+let lastRenderTime=0;
+let lockedNoteVisible=null;
 function animate(time=0){
   requestAnimationFrame(animate);
+  const frameInterval=performanceProfile.targetFps?1000/performanceProfile.targetFps:0;
+  if(frameInterval&&time-lastRenderTime<frameInterval)return;
+  lastRenderTime=time;
   const targetY=3.4+scrollProgress*57.2;
-  const smoothing=reducedMotion?.18:.055;
+  const smoothing=reducedMotion?.18:(IS_MOBILE?.13:.055);
   currentCameraY=THREE.MathUtils.lerp(currentCameraY,targetY,smoothing);
 
   const profile=cameraProfile();
@@ -1128,6 +1223,9 @@ function animate(time=0){
   camera.lookAt(trunkTarget.x*.4,lookY,trunkTarget.z*.4);
 
   branches.forEach(branch=>{
+    const isVisible=branch.baseVisible&&(!IS_MOBILE||Math.abs(branch.group.position.y-currentCameraY)<performanceProfile.branchRenderDistance);
+    if(branch.group.visible!==isVisible)branch.group.visible=isVisible;
+    if(!isVisible)return;
     const target=branch.targetScale;
     const easing=branch.unlocked ? (reducedMotion?.18:.07) : .14;
     const s=THREE.MathUtils.lerp(branch.group.scale.x,target,easing);
@@ -1138,42 +1236,53 @@ function animate(time=0){
     }
   });
 
-  raycaster.setFromCamera(pointer,camera);
-  const hit=raycaster.intersectObjects(interactives,false)[0];
-  const nextHit=hit?.object||null;
-  const nextHover=nextHit?.userData?.hoverTarget||nextHit;
-  if(nextHover!==hovered){
-    if(hovered)hovered.scale.setScalar(1);
-    hovered=nextHover;
-    if(hovered)hovered.scale.setScalar(1.045);
-    canvas.style.cursor=nextHit?"pointer":"default";
+  if(canopyGroup){
+    const canopyVisible=!IS_MOBILE||Math.abs(canopyGroup.position.y-currentCameraY)<performanceProfile.branchRenderDistance+8;
+    if(canopyGroup.visible!==canopyVisible)canopyGroup.visible=canopyVisible;
   }
 
-  petals.rotation.y=time*.000015;
-  for(let i=0;i<petalCount;i++){
-    const p=petalData[i];
-    p.y-=p.speed;
-    p.x+=Math.sin(time*.0005+i)*.002+p.drift;
-    p.rot+=.01;
-    if(p.y<-1){
-      p.y=64+Math.random()*5;
-      p.x=(Math.random()-.5)*22;
-      p.z=(Math.random()-.5)*18;
+  if(!IS_TOUCH){
+    raycaster.setFromCamera(pointer,camera);
+    const hit=raycaster.intersectObjects(interactives,false)[0];
+    const nextHit=hit?.object||null;
+    const nextHover=nextHit?.userData?.hoverTarget||nextHit;
+    if(nextHover!==hovered){
+      if(hovered)hovered.scale.setScalar(1);
+      hovered=nextHover;
+      if(hovered)hovered.scale.setScalar(1.045);
+      const cursor=nextHit?"pointer":"default";
+      if(canvas.style.cursor!==cursor)canvas.style.cursor=cursor;
     }
-    dummy.position.set(p.x,p.y,p.z);
-    dummy.rotation.set(p.rot,p.rot*.6,p.rot*.3);
-    const sc=.72+(i%4)*.12;
-    dummy.scale.set(sc*.65,sc*1.25,sc);
-    dummy.updateMatrix();
-    petals.setMatrixAt(i,dummy.matrix);
   }
-  petals.instanceMatrix.needsUpdate=true;
 
-  pinkLight.position.y=25+Math.sin(time*.00035)*3;
+  if(petals.visible){
+    petals.rotation.y=time*.000015;
+    for(let i=0;i<petalData.length;i++){
+      const p=petalData[i];
+      p.y-=p.speed;
+      p.x+=Math.sin(time*.0005+i)*.002+p.drift;
+      p.rot+=.01;
+      if(p.y<-1){
+        p.y=64+Math.random()*5;
+        p.x=(Math.random()-.5)*22;
+        p.z=(Math.random()-.5)*18;
+      }
+      dummy.position.set(p.x,p.y,p.z);
+      dummy.rotation.set(p.rot,p.rot*.6,p.rot*.3);
+      const sc=.72+(i%4)*.12;
+      dummy.scale.set(sc*.65,sc*1.25,sc);
+      dummy.updateMatrix();
+      petals.setMatrixAt(i,dummy.matrix);
+    }
+    petals.instanceMatrix.needsUpdate=true;
+  }
+
+  if(!IS_MOBILE)pinkLight.position.y=25+Math.sin(time*.00035)*3;
   updateChapter();
 
   const maxUnlockedT=.075+Math.max(0,unlockedCount()-1)*(.865/(MEM.length-1));
-  lockedNote.classList.toggle("show",!demoMode&&scrollProgress>maxUnlockedT+.07);
+  const showLocked=!demoMode&&scrollProgress>maxUnlockedT+.07;
+  if(lockedNoteVisible!==showLocked){lockedNoteVisible=showLocked;lockedNote.classList.toggle("show",showLocked);}
 
   renderer.render(scene,camera);
 }
@@ -1181,6 +1290,7 @@ function animate(time=0){
 function openMemory(index){
   const m=MEM[index];
   modal.dataset.memoryIndex=index;
+  preloadPhoto(index);
   applyCardPhoto(index);
   cardImage.alt=`Fotografia da memória de ${fmt(m[0])}`;
   cardCaption.textContent=`${fmt(m[0])} · memória ${String(index+1).padStart(2,"0")}`;
@@ -1261,15 +1371,43 @@ soundBtn.addEventListener("click",()=>{
 });
 
 function onResize(){
-  renderer.setPixelRatio(Math.min(1.75,window.devicePixelRatio||1));
+  const previousProfile=performanceProfile;
+  IS_TOUCH=window.matchMedia("(pointer: coarse)").matches;
+  IS_MOBILE=IS_TOUCH||window.innerWidth<=820;
+  MOBILE_LOW=IS_MOBILE&&window.innerWidth<=560;
+  performanceProfile=getPerformanceProfile();
+  canvas.style.touchAction=IS_TOUCH?"none":"pan-y";
+  renderer.setPixelRatio(performanceProfile.pixelRatio);
   renderer.setSize(innerWidth,innerHeight,false);
+  renderer.shadowMap.enabled=performanceProfile.shadows;
+  key.castShadow=performanceProfile.shadows;
+  key.shadow.mapSize.set(performanceProfile.shadowMapSize||1,performanceProfile.shadowMapSize||1);
+  pinkLight.visible=!IS_MOBILE;
+  moonLight.visible=!IS_MOBILE;
+  hemi.intensity=IS_MOBILE?1.82:1.55;
   const profile=cameraProfile();
   camera.aspect=innerWidth/innerHeight;
   camera.fov=profile.fov;
+  camera.position.z=profile.baseZ;
   camera.updateProjectionMatrix();
+  if(previousProfile.starsCount!==performanceProfile.starsCount)buildStars();
+  if(previousProfile.petalCount!==performanceProfile.petalCount)buildPetals();
+  if(previousProfile.previewWidth!==performanceProfile.previewWidth){
+    photoTextures.forEach(texture=>texture.dispose());
+    photoTextures.clear();
+    branches.forEach(branch=>{
+      if(branch.photo){
+        branch.photo.material.map=photoTexture(branch.index);
+        branch.photo.material.needsUpdate=true;
+      }
+    });
+  }
+  if(IS_MOBILE)primePhotosNearCamera();
+  updateScroll();
 }
 addEventListener("resize",onResize);
 
+canvas.style.touchAction=IS_TOUCH?"none":"pan-y";
 updateScroll();
 animate();
 window.__treeReady=true;
