@@ -21,11 +21,11 @@
   --sans:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
 }
 *{box-sizing:border-box}
-html,body{margin:0;min-height:100%;background:var(--bg);color:var(--paper);font-family:var(--sans)}
+html,body{margin:0;min-height:100%;background:var(--bg);color:var(--paper);font-family:var(--sans);-webkit-overflow-scrolling:touch}
 body{height:6900px;overflow-x:hidden}
 button{font:inherit;cursor:pointer}
 [hidden]{display:none!important}
-#scene{position:fixed;inset:0;width:100%;height:100%;display:block;z-index:1;touch-action:none}
+#scene{position:fixed;inset:0;width:100%;height:100%;display:block;z-index:1;touch-action:pan-y;overscroll-behavior-y:auto}
 .grain{
   position:fixed;inset:0;z-index:90;pointer-events:none;opacity:.13;
   background-image:
@@ -249,6 +249,13 @@ button{font:inherit;cursor:pointer}
   .card-letter{padding:30px 24px}
   .brand small{display:none}
   .chapter{top:82px}
+}
+@media (hover:none) and (pointer:coarse){
+  .scroll-hint span{font-size:0}
+  .scroll-hint span:after{content:"deslize para subir";font-size:.75rem}
+  .mouse{width:24px;height:38px;border-radius:14px 14px 18px 18px}
+  .mouse:before{content:"";position:absolute;left:50%;top:-7px;width:8px;height:19px;transform:translateX(-50%);border-radius:999px;background:rgba(255,255,255,.82)}
+  .mouse:after{top:12px;width:4px;height:8px}
 }
 @media(max-width:560px){
   body{height:7900px}
@@ -479,8 +486,14 @@ const scene=new THREE.Scene();
 scene.background=new THREE.Color(0x091321);
 scene.fog=new THREE.FogExp2(0x0b1525,.016);
 
-const camera=new THREE.PerspectiveCamera(43,innerWidth/innerHeight,.1,160);
-camera.position.set(0,3.8,15.5);
+function cameraProfile(){
+  if(innerWidth<=560)return {fov:55,baseZ:33.5,orbitZ:0.95,orbitX:0.95};
+  if(innerWidth<=820)return {fov:55,baseZ:21.0,orbitZ:0.72,orbitX:1.25};
+  return {fov:43,baseZ:15.3,orbitZ:1.05,orbitX:2.15};
+}
+const initialCameraProfile=cameraProfile();
+const camera=new THREE.PerspectiveCamera(initialCameraProfile.fov,innerWidth/innerHeight,.1,160);
+camera.position.set(0,3.8,initialCameraProfile.baseZ);
 
 const hemi=new THREE.HemisphereLight(0xbfd9ff,0x283629,1.55);
 scene.add(hemi);
@@ -1025,8 +1038,26 @@ function pointerFromEvent(e){
   pointer.x=(e.clientX/innerWidth)*2-1;
   pointer.y=-(e.clientY/innerHeight)*2+1;
 }
+let pointerDownPosition=null;
+let pointerDragged=false;
+canvas.addEventListener("pointerdown",e=>{
+  pointerDownPosition={x:e.clientX,y:e.clientY};
+  pointerDragged=false;
+});
 canvas.addEventListener("pointermove",e=>{
   pointerFromEvent(e);
+  if(pointerDownPosition){
+    const dx=e.clientX-pointerDownPosition.x;
+    const dy=e.clientY-pointerDownPosition.y;
+    if(Math.hypot(dx,dy)>10)pointerDragged=true;
+  }
+});
+canvas.addEventListener("pointerup",()=>{
+  requestAnimationFrame(()=>{pointerDownPosition=null;});
+});
+canvas.addEventListener("pointercancel",()=>{
+  pointerDownPosition=null;
+  pointerDragged=false;
 });
 canvas.addEventListener("pointerleave",()=>{
   pointer.set(9,9);
@@ -1034,6 +1065,10 @@ canvas.addEventListener("pointerleave",()=>{
   canvas.style.cursor="default";
 });
 canvas.addEventListener("click",e=>{
+  if(pointerDragged){
+    pointerDragged=false;
+    return;
+  }
   pointerFromEvent(e);
   raycaster.setFromCamera(pointer,camera);
   const hit=raycaster.intersectObjects(interactives,false)[0];
@@ -1050,10 +1085,10 @@ function updateScroll(){
 }
 addEventListener("scroll",updateScroll,{passive:true});
 addEventListener("wheel",e=>{
-  if(!e.deltaY) return;
+  if(!e.deltaY)return;
   e.preventDefault();
   const delta=e.deltaMode===1?e.deltaY*16:e.deltaY;
-  window.scrollBy({top:-delta,left:0});
+  window.scrollBy({top:delta,left:0,behavior:"auto"});
 },{passive:false});
 
 const chapters=[
@@ -1081,8 +1116,9 @@ function animate(time=0){
   const smoothing=reducedMotion?.18:.055;
   currentCameraY=THREE.MathUtils.lerp(currentCameraY,targetY,smoothing);
 
-  const orbit=reducedMotion?0:Math.sin(scrollProgress*Math.PI*2.25)*2.15;
-  const orbitZ=reducedMotion?15.8:15.3+Math.sin(scrollProgress*Math.PI*3.1)*1.05;
+  const profile=cameraProfile();
+  const orbit=reducedMotion?0:Math.sin(scrollProgress*Math.PI*2.25)*profile.orbitX;
+  const orbitZ=reducedMotion?profile.baseZ+.5:profile.baseZ+Math.sin(scrollProgress*Math.PI*3.1)*profile.orbitZ;
   camera.position.x=THREE.MathUtils.lerp(camera.position.x,orbit,.04);
   camera.position.y=currentCameraY;
   camera.position.z=THREE.MathUtils.lerp(camera.position.z,orbitZ,.04);
@@ -1227,7 +1263,9 @@ soundBtn.addEventListener("click",()=>{
 function onResize(){
   renderer.setPixelRatio(Math.min(1.75,window.devicePixelRatio||1));
   renderer.setSize(innerWidth,innerHeight,false);
+  const profile=cameraProfile();
   camera.aspect=innerWidth/innerHeight;
+  camera.fov=profile.fov;
   camera.updateProjectionMatrix();
 }
 addEventListener("resize",onResize);
