@@ -1038,6 +1038,7 @@ scene.add(petals);
 const raycaster=new THREE.Raycaster();
 const pointer=new THREE.Vector2(9,9);
 const TAP_SLOP=10;
+const isTouchDevice=matchMedia("(hover:none) and (pointer:coarse)").matches;
 
 function pointerFromEvent(e){
   pointer.x=(e.clientX/innerWidth)*2-1;
@@ -1134,7 +1135,8 @@ function updateScroll(){
   const viewportHeight=innerHeight;
   const pageY=scrollY;
   const max=scrollHeight-viewportHeight;
-  const nextProgress=max>0?THREE.MathUtils.clamp(pageY/max,0,1):0;
+  const rawProgress=max>0?THREE.MathUtils.clamp(pageY/max,0,1):0;
+  const nextProgress=isTouchDevice?1-rawProgress:rawProgress;
 
   if(nextProgress!==lastProgress){
     lastProgress=nextProgress;
